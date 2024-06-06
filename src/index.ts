@@ -1,5 +1,6 @@
 import { watch } from "fs";
 import { Hono } from "hono";
+import ms from "pretty-ms";
 import ky, { HTTPError } from "ky";
 import TTLCache from "@isaacs/ttlcache";
 
@@ -96,6 +97,7 @@ const remoteAddr = (c: any): string | null => {
 const app = new Hono();
 
 app.get("/", async (c) => {
+  const start = performance.now();
   const addr = remoteAddr(c);
   if (addr === null) return c.json({ data: "Failed to get remote address" }, 400);
   const tenant = config.tenants.find(({ servers }) => servers.includes(addr));
@@ -112,8 +114,9 @@ app.get("/", async (c) => {
 
   const { search } = new URL(c.req.url);
   const { data, status } = await tweets(search, tenant);
+  const elapsed = ms(performance.now() - start);
 
-  console.log(`GET [status: ${status}] (${tenant.name}) ${search}`);
+  console.log(`GET [status: ${status}] (${tenant.name}) [${elapsed}] ${search}`);
 
   return c.json(data, status);
 });
