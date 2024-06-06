@@ -1,21 +1,26 @@
 import { watch } from "fs";
 import { Hono } from "hono";
 import ms from "pretty-ms";
+import z from "zod";
 import ky, { HTTPError } from "ky";
 import TTLCache from "@isaacs/ttlcache";
 
-type Config = {
-  tenants: {
-    name: string;
-    servers: string[];
-    tokens: string[];
-  }[];
-  cache?: {
-    ttl: number;
-  };
-};
+const getConfig = async () => {
+  const schema = z.object({
+    tenants: z.array(
+      z.object({
+        name: z.string().min(1),
+        servers: z.array(z.string()).min(1),
+        tokens: z.array(z.string()).min(1),
+      }),
+    ),
+    cache: z.object({
+      ttl: z.number().default(60000),
+    }),
+  });
 
-const getConfig = async (): Promise<Config> => Bun.file(".config.json").json();
+  return schema.parse(await Bun.file(".config.json").json());
+};
 
 const rand = (min: number, max: number): number => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -33,10 +38,8 @@ if (config.tenants.length === 0) {
   throw new Error("Provide at least one tenant in the .config.json file");
 }
 
-const ttl = config?.cache?.ttl ?? 60_000; // defaults to 60 seconds max age
 const endpoint = "https://api.twitter.com/2/tweets/search/all";
-
-const cache = new TTLCache<string, Promise<any>>({ ttl });
+const cache = new TTLCache<string, Promise<any>>({ ttl: config.cache.ttl });
 const cacheStats = { requests: 0, hits: 0, misses: 0 };
 
 const tweets = async (search: string, tenant: (typeof config.tenants)[number]): Promise<any> => {
@@ -61,7 +64,7 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
         retry: { limit: 20, delay: () => rand(1000, 2000) },
       }).json();
 
-      cache.setTTL(search, ttl);
+      cache.setTTL(search, config.cache.ttl);
 
       return resolve({ data, status: 200 });
     } catch (error) {
@@ -79,7 +82,7 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
     }
   });
 
-  cache.set(search, promise, { ttl });
+  cache.set(search, promise, { ttl: config.cache.ttl });
 
   return promise;
 };
@@ -108,7 +111,7 @@ app.get("/", async (c) => {
     const ratio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
 
     console.log(
-      `📦 Cache: misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${cache.size}, ttl: ${ttl}`,
+      `📦 Cache: misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${cache.size}, ttl: ${config.cache.ttl}`,
     );
   }
 
