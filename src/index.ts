@@ -15,14 +15,12 @@ const apiTokens = config.apiTokens;
 const ttl = 60_000; // 60 seconds max age
 const endpoint = "https://api.twitter.com/2/tweets/search/all";
 
-let cacheMiss = 0;
-let cacheHits = 0;
-
 const cache = new TTLCache<string, Promise<any>>({ ttl });
+const cacheStats = { hits: 0, misses: 0 };
 
 const tweets = async (search: string): Promise<any> => {
   if (cache.has(search)) {
-    cacheHits++;
+    cacheStats.hits++;
     return cache.get(search);
   }
 
@@ -31,7 +29,7 @@ const tweets = async (search: string): Promise<any> => {
       const data = await ky(endpoint, {
         searchParams: search,
         headers: {
-          authorization: `Bearer ${apiTokens[cacheMiss++ % apiTokens.length]}`,
+          authorization: `Bearer ${apiTokens[cacheStats.misses++ % apiTokens.length]}`,
           "user-agent": "v2FullArchiveSearchPython",
         },
         retry: { limit: 20, delay: () => rand(1000, 2000) },
@@ -68,10 +66,10 @@ app.get("/", async (c) => {
 
   console.log(`GET [status: ${status}] ${search}`);
 
-  if ((cacheHits + cacheMiss) % 1 === 0) {
-    const ratio = Math.floor((cacheHits / (cacheHits + cacheMiss)) * 100) || 0;
+  if ((cacheStats.hits + cacheStats.misses) % 1 === 0) {
+    const ratio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
 
-    console.log(`📦 Cache: misses ${cacheMiss}, hits ${cacheHits} (${ratio}%), size ${cache.size}`);
+    console.log(`📦 Cache: misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${cache.size}`);
   }
 
   return c.json(data, status);
