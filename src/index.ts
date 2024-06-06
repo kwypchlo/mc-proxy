@@ -1,11 +1,32 @@
+import { watch } from "fs";
 import { Hono } from "hono";
 import ky, { HTTPError } from "ky";
 import TTLCache from "@isaacs/ttlcache";
-import config from "../.config.json";
 
-function rand(min: number, max: number): number {
+type Config = {
+  tenants: {
+    name: string;
+    servers: string[];
+    tokens: string[];
+  }[];
+  cache?: {
+    ttl: number;
+  };
+};
+
+const getConfig = async (): Promise<Config> => Bun.file(".config.json").json();
+
+const rand = (min: number, max: number): number => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+};
+
+let config = await getConfig();
+
+watch(import.meta.resolve("../.config.json"), async (event, filename) => {
+  console.log(`Detected ${event} in ${filename}, reloading...`);
+
+  config = await getConfig();
+});
 
 if (config.tenants.length === 0) {
   throw new Error("Provide at least one tenant in the .config.json file");
@@ -15,7 +36,7 @@ const ttl = config?.cache?.ttl ?? 60_000; // defaults to 60 seconds max age
 const endpoint = "https://api.twitter.com/2/tweets/search/all";
 
 const cache = new TTLCache<string, Promise<any>>({ ttl });
-const cacheStats = { hits: 0, misses: 0 };
+const cacheStats = { requests: 0, hits: 0, misses: 0 };
 
 const tweets = async (search: string, tenant: (typeof config.tenants)[number]): Promise<any> => {
   if (tenant.tokens.length === 0) {
@@ -57,7 +78,7 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
     }
   });
 
-  cache.set(search, promise);
+  cache.set(search, promise, { ttl });
 
   return promise;
 };
@@ -80,18 +101,19 @@ app.get("/", async (c) => {
   const tenant = config.tenants.find(({ servers }) => servers.includes(addr));
   if (tenant === undefined) return c.json({ data: `Tenant not found for remote address ${addr}`, status: 403 });
 
-  const { search } = new URL(c.req.url);
-  const { data, status } = await tweets(search, tenant);
-
-  console.log(`GET [status: ${status}] (${tenant.name}) ${search}`);
-
-  if ((cacheStats.hits + cacheStats.misses) % 10 === 0) {
+  // print cache stats every 10 requests
+  if (cacheStats.requests++ % 10 === 0) {
     const ratio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
 
     console.log(
       `📦 Cache: misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${cache.size}, ttl: ${ttl}`,
     );
   }
+
+  const { search } = new URL(c.req.url);
+  const { data, status } = await tweets(search, tenant);
+
+  console.log(`GET [status: ${status}] (${tenant.name}) ${search}`);
 
   return c.json(data, status);
 });
