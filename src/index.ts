@@ -88,7 +88,9 @@ app.get("/", async (c) => {
   if ((cacheStats.hits + cacheStats.misses) % 10 === 0) {
     const ratio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
 
-    console.log(`📦 Cache: misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${cache.size}`);
+    console.log(
+      `📦 Cache: misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${cache.size}, ttl: ${ttl}`,
+    );
   }
 
   return c.json(data, status);
