@@ -11,7 +11,7 @@ if (config.tenants.length === 0) {
   throw new Error("Provide at least one tenant in the .config.json file");
 }
 
-const ttl = 60_000; // 60 seconds max age
+const ttl = config?.cache?.ttl ?? 60_000; // defaults to 60 seconds max age
 const endpoint = "https://api.twitter.com/2/tweets/search/all";
 
 const cache = new TTLCache<string, Promise<any>>({ ttl });

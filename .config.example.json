@@ -1,4 +1,7 @@
 {
+  "cache": {
+    "ttl": 90000
+  },
   "tenants": [
     {
       "name": "Local",
