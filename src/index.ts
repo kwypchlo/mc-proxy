@@ -119,7 +119,7 @@ app.get("/", async (c) => {
   const { data, status } = await tweets(search, tenant);
   const elapsed = ms(performance.now() - start);
 
-  console.log(`GET [status: ${status}] (${tenant.name}) [${elapsed}] ${search}`);
+  console.log(`GET ${status} (${tenant.name}) [${elapsed}] ${search}`);
 
   return c.json(data, status);
 });
