@@ -3,7 +3,17 @@ import { Hono } from "hono";
 import ms from "pretty-ms";
 import z from "zod";
 import ky, { HTTPError } from "ky";
+import chalk from "chalk";
 import TTLCache from "@isaacs/ttlcache";
+
+const cStatusCode = (code: number) => (code === 200 ? chalk.green(code) : chalk.red(code));
+const cResTime = (time: number) => {
+  if (time < 4000) return ms(time);
+  if (time < 7000) return chalk.yellow(ms(time));
+  if (time < 8000) return chalk.red(ms(time));
+  return chalk.redBright(ms(time));
+};
+const cSearch = (search: string) => chalk.gray(search);
 
 const getConfig = async () => {
   const schema = z.object({
@@ -117,9 +127,8 @@ app.get("/", async (c) => {
 
   const { search } = new URL(c.req.url);
   const { data, status } = await tweets(search, tenant);
-  const elapsed = ms(performance.now() - start);
 
-  console.log(`GET ${status} (${tenant.name}) [${elapsed}] ${search}`);
+  console.log(`${cStatusCode(status)} (${tenant.name}) ${cResTime(performance.now() - start)} ${cSearch(search)}`);
 
   return c.json(data, status);
 });
