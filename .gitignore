@@ -1,2 +1,5 @@
+# app config
+.config.json
+
 # deps
 node_modules/
