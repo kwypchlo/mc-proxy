@@ -1,12 +1,25 @@
-import { watch } from "fs";
 import { Hono } from "hono";
 import ms from "pretty-ms";
 import z from "zod";
 import ky, { HTTPError } from "ky";
 import chalk from "chalk";
 import TTLCache from "@isaacs/ttlcache";
+import configJson from "../.config.json";
 
-const configFile = Bun.fileURLToPath(import.meta.resolve("../.config.json"));
+const configSchema = z.object({
+  tenants: z.array(
+    z.object({
+      name: z.string().min(1),
+      servers: z.array(z.string()).min(1),
+      tokens: z.array(z.string()).min(1),
+    }),
+  ),
+  cache: z.object({
+    ttl: z.number().default(60000),
+  }),
+});
+
+const config = configSchema.parse(configJson);
 
 const cStatusCode = (code: number) => (code === 200 ? chalk.green(code) : chalk.red(code));
 const cResTime = (time: number) => {
@@ -16,35 +29,9 @@ const cResTime = (time: number) => {
   return chalk.redBright(ms(time));
 };
 const cSearch = (search: string) => chalk.gray(search);
-
-const getConfig = async () => {
-  const schema = z.object({
-    tenants: z.array(
-      z.object({
-        name: z.string().min(1),
-        servers: z.array(z.string()).min(1),
-        tokens: z.array(z.string()).min(1),
-      }),
-    ),
-    cache: z.object({
-      ttl: z.number().default(60000),
-    }),
-  });
-
-  return schema.parse(await Bun.file(configFile).json());
-};
-
 const rand = (min: number, max: number): number => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
-
-let config = await getConfig();
-
-watch(configFile, async (event, filename) => {
-  console.log(`Detected ${event} in ${filename}, reloading...`);
-
-  config = await getConfig();
-});
 
 if (config.tenants.length === 0) {
   throw new Error("Provide at least one tenant in the .config.json file");
