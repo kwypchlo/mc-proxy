@@ -7,7 +7,6 @@ import TTLCache from "@isaacs/ttlcache";
 import configJson from "../.config.json";
 
 const configSchema = z.object({
-  expose: z.array(z.number()).optional(),
   tenants: z.array(
     z.object({
       name: z.string().min(1),
@@ -130,12 +129,6 @@ app.get("/stats", async (c) => {
     size: cache.size,
     ttl: config.cache.ttl,
   });
-});
-
-config.expose?.forEach((port) => {
-  Bun.serve({ hostname: "0.0.0.0", port, fetch: app.fetch });
-
-  console.log(`Started server http://0.0.0.0:${port} ${chalk.gray("(alias)")}`);
 });
 
 export default {
