@@ -6,6 +6,8 @@ import ky, { HTTPError } from "ky";
 import chalk from "chalk";
 import TTLCache from "@isaacs/ttlcache";
 
+const configFile = Bun.fileURLToPath(import.meta.resolve("../.config.json"));
+
 const cStatusCode = (code: number) => (code === 200 ? chalk.green(code) : chalk.red(code));
 const cResTime = (time: number) => {
   if (time < 4000) return ms(time);
@@ -29,7 +31,7 @@ const getConfig = async () => {
     }),
   });
 
-  return schema.parse(await Bun.file(".config.json").json());
+  return schema.parse(await Bun.file(configFile).json());
 };
 
 const rand = (min: number, max: number): number => {
@@ -38,7 +40,7 @@ const rand = (min: number, max: number): number => {
 
 let config = await getConfig();
 
-watch(import.meta.resolve("../.config.json"), async (event, filename) => {
+watch(configFile, async (event, filename) => {
   console.log(`Detected ${event} in ${filename}, reloading...`);
 
   config = await getConfig();
