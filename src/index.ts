@@ -135,6 +135,15 @@ app.get("/", async (c) => {
   return c.json(data, status);
 });
 
+app.get("/stats", async (c) => {
+  return c.json({
+    ...cacheStats,
+    ratio: `${Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0}%`,
+    size: cache.size,
+    ttl: config.cache.ttl,
+  });
+});
+
 export default {
   hostname: "0.0.0.0",
   port: 3000,
