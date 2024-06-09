@@ -38,7 +38,7 @@ if (config.tenants.length === 0) {
 }
 
 const endpoint = "https://api.twitter.com/2/tweets/search/all";
-const cache = new TTLCache<string, Promise<any>>({ ttl: config.cache.ttl });
+const cache = new TTLCache<string, Promise<any>>({ ttl: config.cache.ttl, checkAgeOnGet: true });
 const cacheStats = { requests: 0, hits: 0, misses: 0 };
 
 const tweets = async (search: string, tenant: (typeof config.tenants)[number]): Promise<any> => {
@@ -46,9 +46,10 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
     return { data: `No tokens found for tenant ${tenant.name}`, status: 403 };
   }
 
-  if (cache.has(search)) {
+  const cached = cache.get(search);
+  if (cached instanceof Promise) {
     cacheStats.hits++;
-    return cache.get(search);
+    return cached;
   }
 
   const currentMiss = cacheStats.misses++;
