@@ -1,25 +1,9 @@
 import { Hono } from "hono";
 import ms from "pretty-ms";
-import z from "zod";
 import ky, { HTTPError } from "ky";
 import chalk from "chalk";
-import TTLCache from "@isaacs/ttlcache";
-import configJson from "../.config.json";
-
-const configSchema = z.object({
-  tenants: z.array(
-    z.object({
-      name: z.string().min(1),
-      servers: z.array(z.string()).min(1),
-      tokens: z.array(z.string()).min(1),
-    }),
-  ),
-  cache: z.object({
-    ttl: z.number().default(60000),
-  }),
-});
-
-const config = configSchema.parse(configJson);
+import { config } from "./config";
+import { cache } from "./cache";
 
 const cStatusCode = (code: number) => (code === 200 ? chalk.green(code) : chalk.red(code));
 const cResTime = (time: number) => {
@@ -38,7 +22,6 @@ if (config.tenants.length === 0) {
 }
 
 const endpoint = "https://api.twitter.com/2/tweets/search/all";
-const cache = new TTLCache<string, Promise<any>>({ ttl: config.cache.ttl, checkAgeOnGet: true });
 const cacheStats = { requests: 0, hits: 0, misses: 0 };
 
 const tweets = async (search: string, tenant: (typeof config.tenants)[number]): Promise<any> => {
