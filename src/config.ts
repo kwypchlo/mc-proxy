@@ -12,6 +12,7 @@ const configSchema = z.object({
   cache: z.object({
     ttl: z.number().default(60000),
   }),
+  coingeckoApiKey: z.string().optional(),
 });
 
 export const config = configSchema.parse(configJson);
