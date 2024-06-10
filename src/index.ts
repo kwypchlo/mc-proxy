@@ -23,7 +23,7 @@ if (config.tenants.length === 0) {
 
 const endpoint = "https://api.twitter.com/2/tweets/search/all";
 const cacheStats = { requests: 0, hits: 0, misses: 0 };
-const invalid: string[] = [];
+const invalid = new Map();
 
 const tweets = async (search: string, tenant: (typeof config.tenants)[number]): Promise<any> => {
   if (tenant.tokens.length === 0) {
@@ -40,7 +40,7 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
     }
   }
 
-  const tokens = tenant.tokens.filter((token) => invalid.includes(token) === false);
+  const tokens = tenant.tokens.filter((token) => invalid.has(token) === false);
   const token = tokens[cacheStats.misses++ % tokens.length];
   const promise = new Promise(async (resolve) => {
     try {
@@ -65,7 +65,7 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
         );
 
         if (error.response.status === 403) {
-          invalid.push(token);
+          invalid.set(token, true);
         }
 
         return resolve({ data: undefined, status: error.response.status });
@@ -100,7 +100,7 @@ app.get("/", async (c) => {
   if (addr === null) return c.json({ data: "Failed to get remote address" }, 400);
   const tenant = config.tenants.find(({ servers }) => servers.includes(addr));
   if (tenant === undefined) return c.json({ data: `Tenant not found for remote address ${addr}` }, 403);
-  if (tenant.servers.every((server) => invalid.includes(server))) return c.json({ data: `Twitter Api Forbidden` }, 403);
+  if (tenant.tokens.every((token) => invalid.has(token))) return c.json({ data: `Twitter Api Forbidden` }, 403);
 
   // print cache stats every 10 requests
   if (cacheStats.requests++ % 10 === 0) {
