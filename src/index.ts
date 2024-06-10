@@ -35,13 +35,13 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
     return cached;
   }
 
-  const currentMiss = cacheStats.misses++;
+  const token = tenant.tokens[cacheStats.misses++ % tenant.tokens.length];
   const promise = new Promise(async (resolve) => {
     try {
       const data = await ky(endpoint, {
         searchParams: search,
         headers: {
-          authorization: `Bearer ${tenant.tokens[currentMiss % tenant.tokens.length]}`,
+          authorization: `Bearer ${token}`,
           "user-agent": "v2FullArchiveSearchPython",
         },
         retry: { limit: 20, delay: () => rand(1000, 2000) },
@@ -54,12 +54,14 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
       cache.delete(search);
 
       if (error instanceof HTTPError) {
-        console.log("\t", "[Twitter Api HTTPError]", error.response.status, error.response.statusText);
+        console.log(
+          `[Twitter Api HTTPError] (${tenant.name} ${token.slice(-5)}) ${error.response.status}  ${error.response.statusText}`,
+        );
 
         return resolve({ data: undefined, status: error.response.status });
       }
 
-      console.log("\t", "[Error]", String(error));
+      console.log(`[Error] (${tenant.name} ${token.slice(-5)}) ${String(error)}`);
 
       return resolve({ data: undefined, status: 500 });
     }
