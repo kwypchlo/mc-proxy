@@ -31,8 +31,12 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
 
   const cached = cache.get(search);
   if (cached instanceof Promise) {
-    cacheStats.hits++;
-    return cached;
+    const { status } = await cached;
+
+    if (status === 200) {
+      cacheStats.hits++;
+      return cached;
+    }
   }
 
   const token = tenant.tokens[cacheStats.misses++ % tenant.tokens.length];
