@@ -15,6 +15,10 @@ const useNextToken = (tenant: (typeof config.tenants)[number]) => {
   let selected = tokens[0];
 
   for (const token of tokens) {
+    if (!(tenant.name in usage)) {
+      usage[tenant.name] = {};
+    }
+
     if (!(token in usage[tenant.name])) {
       usage[tenant.name][token] = 0;
     }
