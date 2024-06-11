@@ -52,42 +52,56 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
   cacheStats.misses++;
 
   const promise = new Promise(async (resolve) => {
-    const { token, releaseToken } = useNextToken(tenant);
+    let currentToken: null | ReturnType<typeof useNextToken> = null;
 
     try {
       const data = await ky("https://api.twitter.com/2/tweets/search/all", {
         searchParams: search,
-        headers: {
-          authorization: `Bearer ${token}`,
-          "user-agent": "v2FullArchiveSearchPython",
-        },
+        headers: { "user-agent": "v2FullArchiveSearchPython" },
         retry: { limit: 10, delay: () => rand(1000, 2000) },
         timeout: 15 * 1000, // 15 seconds timeout
+        hooks: {
+          beforeRequest: [
+            async (request) => {
+              if (currentToken !== null) {
+                currentToken.releaseToken();
+              }
+
+              currentToken = useNextToken(tenant);
+
+              request.headers.set("authorization", `Bearer ${currentToken.token}`);
+            },
+          ],
+        },
       }).json();
 
-      releaseToken();
+      if (currentToken !== null) {
+        (currentToken as ReturnType<typeof useNextToken>).releaseToken();
+        currentToken = null;
+      }
 
       cache.setTTL(search, config.cache.ttl);
 
       return resolve({ data, status: 200 });
     } catch (error) {
-      releaseToken();
+      if (currentToken !== null) {
+        (currentToken as ReturnType<typeof useNextToken>).releaseToken();
+        currentToken = null;
+      }
 
       cache.delete(search);
 
       if (error instanceof HTTPError) {
-        console.log(
-          `[Twitter Api HTTPError] (${tenant.name} ${token.slice(-5)}) ${error.response.status}  ${error.response.statusText}`,
-        );
+        console.log(`[Twitter Api HTTPError] (${tenant.name}}) ${error.response.status}  ${error.response.statusText}`);
 
-        if (error.response.status === 403) {
-          invalid.set(token, true);
-        }
+        // if (error.response.status === 403) {
+        //   invalid.set(token, true);
+        // }
 
         return resolve({ data: undefined, status: error.response.status });
       }
 
-      console.log(`[Error] (${tenant.name} ${token.slice(-5)}) ${String(error)}`);
+      console.log(`[Error] (${tenant.name}) ${String(error)}`);
 
       return resolve({ data: undefined, status: 500 });
     }
