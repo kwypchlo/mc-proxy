@@ -32,7 +32,7 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
           authorization: `Bearer ${token}`,
           "user-agent": "v2FullArchiveSearchPython",
         },
-        retry: { limit: 20, delay: () => rand(1000, 2000) },
+        retry: { limit: 3, delay: () => rand(1000, 2000) },
         hooks: {
           beforeRetry: [
             async ({ request, options, error, retryCount }) => {
