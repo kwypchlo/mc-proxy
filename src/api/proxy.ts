@@ -6,6 +6,36 @@ import type { Context, Next } from "hono";
 import ms from "pretty-ms";
 
 const invalid = new Map();
+const usage = {} as Record<string, { [token: string]: number }>;
+
+const useNextToken = (tenant: (typeof config.tenants)[number]) => {
+  const tokens = tenant.tokens.filter((token) => invalid.has(token) === false);
+  let selected = tokens[0];
+
+  for (const token of tokens) {
+    if (!(token in usage[tenant.name])) {
+      usage[tenant.name][token] = 0;
+    }
+
+    if (usage[tenant.name][token] < usage[tenant.name][selected]) {
+      selected = token;
+    }
+  }
+
+  usage[tenant.name][selected]++;
+
+  let released = false;
+
+  return {
+    token: selected,
+    releaseToken: () => {
+      if (released === false && usage[tenant.name][selected]) {
+        usage[tenant.name][selected]--;
+        released = true;
+      }
+    },
+  };
+};
 
 const tweets = async (search: string, tenant: (typeof config.tenants)[number]): Promise<any> => {
   const cached = cache.get(search);
@@ -18,9 +48,11 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
     }
   }
 
-  const tokens = tenant.tokens.filter((token) => invalid.has(token) === false);
-  const token = tokens[cacheStats.misses++ % tokens.length];
+  cacheStats.misses++;
+
   const promise = new Promise(async (resolve) => {
+    const { token, releaseToken } = useNextToken(tenant);
+
     try {
       const data = await ky("https://api.twitter.com/2/tweets/search/all", {
         searchParams: search,
@@ -32,10 +64,14 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
         timeout: 15 * 1000, // 15 seconds timeout
       }).json();
 
+      releaseToken();
+
       cache.setTTL(search, config.cache.ttl);
 
       return resolve({ data, status: 200 });
     } catch (error) {
+      releaseToken();
+
       cache.delete(search);
 
       if (error instanceof HTTPError) {
