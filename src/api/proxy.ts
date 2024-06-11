@@ -30,24 +30,10 @@ const useNextToken = (tenant: (typeof config.tenants)[number]) => {
 
   usage[tenant.name][selected]++;
 
-  console.log(
-    "+++ using",
-    tenant.name,
-    tokens.indexOf(selected),
-    JSON.stringify(tokens.map((token) => usage[tenant.name][token])),
-  );
-
   return {
     token: selected,
     releaseToken: () => {
       usage[tenant.name][selected]--;
-
-      console.log(
-        "--- clean",
-        tenant.name,
-        tokens.indexOf(selected),
-        JSON.stringify(tokens.map((token) => usage[tenant.name][token])),
-      );
     },
   };
 };
@@ -75,7 +61,7 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
           authorization: `Bearer ${token}`,
           "user-agent": "v2FullArchiveSearchPython",
         },
-        retry: { limit: 20, delay: () => rand(1000, 2000) },
+        retry: { limit: 10, delay: () => rand(1000, 2000) },
         timeout: 15 * 1000, // 15 seconds timeout
       }).json();
 
@@ -138,7 +124,6 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
 };
 
 setInterval(() => {
-  console.log("📊 Usage");
   for (const tenant in usage) {
     console.log("🎯", tenant, JSON.stringify(Object.values(usage[tenant])));
   }
