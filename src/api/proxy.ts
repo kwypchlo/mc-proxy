@@ -120,5 +120,9 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
     console.log(
       `📦 Cache: misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${cache.size}, ttl: ${config.cache.ttl}`,
     );
+
+    console.log(
+      `🔑 Usage: ${JSON.stringify(Object.keys(usage).map((tenant) => [tenant, Object.values(usage[tenant])]))}`,
+    );
   }
 };
