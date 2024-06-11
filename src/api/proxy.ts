@@ -33,6 +33,15 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
           "user-agent": "v2FullArchiveSearchPython",
         },
         retry: { limit: 20, delay: () => rand(1000, 2000) },
+        hooks: {
+          beforeRetry: [
+            async ({ request, options, error, retryCount }) => {
+              console.log(
+                `[Retry] (${tenant.name} ${token.slice(-5)}) ${retryCount} ${error}, ${new Date().toISOString()}, retry after ${request.headers.get("retry-after")}`,
+              );
+            },
+          ],
+        },
       }).json();
 
       cache.setTTL(search, config.cache.ttl);
