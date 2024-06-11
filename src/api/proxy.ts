@@ -28,9 +28,14 @@ const useNextToken = (tenant: (typeof config.tenants)[number]) => {
     }
   }
 
-  console.log("+++ use", tokens.indexOf(selected), JSON.stringify(tokens.map((token) => usage[tenant.name][token])));
-
   usage[tenant.name][selected]++;
+
+  console.log(
+    "+++ using",
+    tenant.name,
+    tokens.indexOf(selected),
+    JSON.stringify(tokens.map((token) => usage[tenant.name][token])),
+  );
 
   return {
     token: selected,
@@ -38,7 +43,8 @@ const useNextToken = (tenant: (typeof config.tenants)[number]) => {
       usage[tenant.name][selected]--;
 
       console.log(
-        "--- rel",
+        "--- clean",
+        tenant.name,
         tokens.indexOf(selected),
         JSON.stringify(tokens.map((token) => usage[tenant.name][token])),
       );
@@ -130,3 +136,10 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
     );
   }
 };
+
+setInterval(() => {
+  console.log("📊 Usage");
+  for (const tenant in usage) {
+    console.log("🎯", tenant, JSON.stringify(usage[tenant]));
+  }
+}, 5000);
