@@ -6,8 +6,6 @@ import { HTTPException } from "hono/http-exception";
 export const getTenant = (c: Context) => {
   const connInfo = getConnInfo(c);
 
-  console.log("connInfo", connInfo);
-
   if (connInfo.remote.addressType !== "IPv4") {
     throw new HTTPException(400, { message: `Invalid address type: ${connInfo.remote.addressType}` });
   }

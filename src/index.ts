@@ -85,8 +85,6 @@ app.get("/", async (c) => {
   const start = performance.now();
   const tenant = getTenant(c);
 
-  console.log("tenant", tenant);
-
   // print cache stats every 10 requests
   if (cacheStats.requests++ % 10 === 0) {
     const ratio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
