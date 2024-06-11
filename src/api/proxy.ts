@@ -8,6 +8,8 @@ import ms from "pretty-ms";
 const invalid = new Map();
 const usage = {} as Record<string, { [token: string]: number }>;
 
+const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1) + min);
+
 const useNextToken = (tenant: (typeof config.tenants)[number]) => {
   const tokens = tenant.tokens.filter((token) => invalid.has(token) === false);
   let selected = tokens[0];
@@ -60,7 +62,7 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
           authorization: `Bearer ${token}`,
           "user-agent": "v2FullArchiveSearchPython",
         },
-        retry: { limit: 20, backoffLimit: 1000 },
+        retry: { limit: 20, delay: () => rand(1000, 2000) },
         timeout: 15 * 1000, // 15 seconds timeout
       }).json();
 
