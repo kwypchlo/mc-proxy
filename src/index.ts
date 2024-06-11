@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { getConnInfo } from "hono/bun";
 import ms from "pretty-ms";
 import ky, { HTTPError } from "ky";
 import chalk from "chalk";
 import { config } from "./config";
 import { cache } from "./cache";
+import { getTenant } from "./tenant";
 
 const cStatusCode = (code: number) => (code === 200 ? chalk.green(code) : chalk.red(code));
 const cResTime = (time: number) => {
@@ -79,28 +79,11 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
   return promise;
 };
 
-const remoteAddr = (c: any): string | null => {
-  try {
-    const { address } = c.env.requestIP(c.req.raw);
-
-    return address;
-  } catch {
-    return null;
-  }
-};
-
 const app = new Hono();
 
 app.get("/", async (c) => {
-  console.log(getConnInfo(c));
-
   const start = performance.now();
-  const addr = remoteAddr(c);
-  if (addr === null) return c.json({ data: "Failed to get remote address" }, 400);
-  const tenant = config.tenants.find(({ servers }) => servers.includes(addr));
-  if (tenant === undefined) return c.json({ data: `Tenant not found for remote address ${addr}` }, 403);
-  if (tenant.tokens.length === 0) return c.json({ data: `No tokens found for tenant ${tenant.name}` }, 403);
-  if (tenant.tokens.every((token) => invalid.has(token))) return c.json({ data: `Twitter Api Forbidden` }, 403);
+  const tenant = getTenant(c);
 
   // print cache stats every 10 requests
   if (cacheStats.requests++ % 10 === 0) {
