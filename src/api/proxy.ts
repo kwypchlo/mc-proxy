@@ -4,12 +4,39 @@ import { config } from "../config";
 import { getTenant } from "../tenant";
 import type { Context, Next } from "hono";
 import ms from "pretty-ms";
-
-const rand = (min: number, max: number): number => {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-};
+import { shuffle } from "lodash-es";
 
 const invalid = new Map();
+const usage = {} as Record<string, { [token: string]: number }>;
+
+const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1) + min);
+const useNextToken = (tenant: (typeof config.tenants)[number]) => {
+  const tokens = shuffle(tenant.tokens.filter((token) => invalid.has(token) === false));
+  let selected = tokens[0];
+
+  for (const token of tokens) {
+    if (!(tenant.name in usage)) {
+      usage[tenant.name] = {};
+    }
+
+    if (!(token in usage[tenant.name])) {
+      usage[tenant.name][token] = 0;
+    }
+
+    if (usage[tenant.name][token] < usage[tenant.name][selected]) {
+      selected = token;
+    }
+  }
+
+  usage[tenant.name][selected]++;
+
+  return {
+    token: selected,
+    releaseToken: () => {
+      usage[tenant.name][selected]--;
+    },
+  };
+};
 
 const tweets = async (search: string, tenant: (typeof config.tenants)[number]): Promise<any> => {
   const cached = cache.get(search);
@@ -22,38 +49,59 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
     }
   }
 
-  const tokens = tenant.tokens.filter((token) => invalid.has(token) === false);
-  const token = tokens[cacheStats.misses++ % tokens.length];
+  cacheStats.misses++;
+
   const promise = new Promise(async (resolve) => {
+    let currentToken: null | ReturnType<typeof useNextToken> = null;
+
     try {
       const data = await ky("https://api.twitter.com/2/tweets/search/all", {
         searchParams: search,
-        headers: {
-          authorization: `Bearer ${token}`,
-          "user-agent": "v2FullArchiveSearchPython",
+        headers: { "user-agent": "v2FullArchiveSearchPython" },
+        retry: { limit: 10, delay: () => rand(1000, 2000) },
+        timeout: 15 * 1000, // 15 seconds timeout
+        hooks: {
+          beforeRequest: [
+            async (request) => {
+              if (currentToken !== null) {
+                currentToken.releaseToken();
+              }
+
+              currentToken = useNextToken(tenant);
+
+              request.headers.set("authorization", `Bearer ${currentToken.token}`);
+            },
+          ],
         },
-        retry: { limit: 20, delay: () => rand(1000, 2000) },
       }).json();
+
+      if (currentToken !== null) {
+        (currentToken as ReturnType<typeof useNextToken>).releaseToken();
+        currentToken = null;
+      }
 
       cache.setTTL(search, config.cache.ttl);
 
       return resolve({ data, status: 200 });
     } catch (error) {
+      if (currentToken !== null) {
+        (currentToken as ReturnType<typeof useNextToken>).releaseToken();
+        currentToken = null;
+      }
+
       cache.delete(search);
 
       if (error instanceof HTTPError) {
-        console.log(
-          `[Twitter Api HTTPError] (${tenant.name} ${token.slice(-5)}) ${error.response.status}  ${error.response.statusText}`,
-        );
+        console.log(`[Twitter Api HTTPError] (${tenant.name}}) ${error.response.status}  ${error.response.statusText}`);
 
-        if (error.response.status === 403) {
-          invalid.set(token, true);
-        }
+        // if (error.response.status === 403) {
+        //   invalid.set(token, true);
+        // }
 
         return resolve({ data: undefined, status: error.response.status });
       }
 
-      console.log(`[Error] (${tenant.name} ${token.slice(-5)}) ${String(error)}`);
+      console.log(`[Error] (${tenant.name}) ${String(error)}`);
 
       return resolve({ data: undefined, status: 500 });
     }
@@ -85,6 +133,10 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
 
     console.log(
       `📦 Cache: misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${cache.size}, ttl: ${config.cache.ttl}`,
+    );
+
+    console.log(
+      `🔑 Usage: ${JSON.stringify(Object.keys(usage).map((tenant) => [tenant, Object.values(usage[tenant])]))}`,
     );
   }
 };
