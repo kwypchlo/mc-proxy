@@ -37,7 +37,8 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
           beforeRetry: [
             async ({ request, options, error, retryCount }) => {
               console.log(
-                `[Retry] (${tenant.name} ${token.slice(-5)}) ${retryCount} ${error}, ${new Date().toISOString()}, retry after ${request.headers.get("retry-after")}`,
+                `[Retry] (${tenant.name} ${token.slice(-5)}) ${retryCount} ${error}, ${new Date().toISOString()}`,
+                request.headers.toJSON(),
               );
             },
           ],
