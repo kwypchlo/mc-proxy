@@ -4,14 +4,14 @@ import { config } from "../config";
 import { getTenant } from "../tenant";
 import type { Context, Next } from "hono";
 import ms from "pretty-ms";
+import { shuffle } from "lodash-es";
 
 const invalid = new Map();
 const usage = {} as Record<string, { [token: string]: number }>;
 
 const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1) + min);
-
 const useNextToken = (tenant: (typeof config.tenants)[number]) => {
-  const tokens = tenant.tokens.filter((token) => invalid.has(token) === false);
+  const tokens = shuffle(tenant.tokens.filter((token) => invalid.has(token) === false));
   let selected = tokens[0];
 
   for (const token of tokens) {
