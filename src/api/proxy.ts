@@ -28,26 +28,20 @@ const useNextToken = (tenant: (typeof config.tenants)[number]) => {
     }
   }
 
-  console.log(
-    "> Usage",
-    tenant.name,
-    "Selected:",
-    tokens.indexOf(selected),
-    "Tokens:",
-    JSON.stringify(tokens.map((token) => usage[tenant.name][token])),
-  );
+  console.log("+++ use", tokens.indexOf(selected), JSON.stringify(tokens.map((token) => usage[tenant.name][token])));
 
   usage[tenant.name][selected]++;
-
-  let released = false;
 
   return {
     token: selected,
     releaseToken: () => {
-      if (released === false && usage[tenant.name][selected]) {
-        usage[tenant.name][selected]--;
-        released = true;
-      }
+      usage[tenant.name][selected]--;
+
+      console.log(
+        "--- rel",
+        tokens.indexOf(selected),
+        JSON.stringify(tokens.map((token) => usage[tenant.name][token])),
+      );
     },
   };
 };
