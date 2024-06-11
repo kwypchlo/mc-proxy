@@ -5,10 +5,6 @@ import { getTenant } from "../tenant";
 import type { Context, Next } from "hono";
 import ms from "pretty-ms";
 
-const rand = (min: number, max: number): number => {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-};
-
 const invalid = new Map();
 
 const tweets = async (search: string, tenant: (typeof config.tenants)[number]): Promise<any> => {
@@ -32,16 +28,8 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
           authorization: `Bearer ${token}`,
           "user-agent": "v2FullArchiveSearchPython",
         },
-        retry: { limit: 20, delay: () => rand(1000, 2000) },
-        hooks: {
-          beforeRetry: [
-            async ({ request, options, error, retryCount }) => {
-              console.log(
-                `[Retry] (${tenant.name} ${token.slice(-5)}) ${retryCount} ${error}, ${new Date().toISOString()}`,
-              );
-            },
-          ],
-        },
+        retry: { limit: 20, backoffLimit: 1000 },
+        timeout: 15 * 1000, // 15 seconds timeout
       }).json();
 
       cache.setTTL(search, config.cache.ttl);
@@ -51,11 +39,6 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
       cache.delete(search);
 
       if (error instanceof HTTPError) {
-        console.log(
-          `[403] (${tenant.name} ${token.slice(-5)}), ${new Date().toISOString()}`,
-          error.response.headers.toJSON(),
-        );
-
         console.log(
           `[Twitter Api HTTPError] (${tenant.name} ${token.slice(-5)}) ${error.response.status}  ${error.response.statusText}`,
         );
