@@ -32,24 +32,13 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
           authorization: `Bearer ${token}`,
           "user-agent": "v2FullArchiveSearchPython",
         },
-        retry: { limit: 20, delay: () => rand(1000, 2000) },
+        retry: { limit: 3, delay: () => rand(1000, 2000) },
         hooks: {
           beforeRetry: [
             async ({ request, options, error, retryCount }) => {
               console.log(
                 `[Retry] (${tenant.name} ${token.slice(-5)}) ${retryCount} ${error}, ${new Date().toISOString()}`,
               );
-            },
-          ],
-          afterResponse: [
-            // Or retry with a fresh token on a 403 error
-            async (request, options, response) => {
-              if (response.status === 403) {
-                console.log(
-                  `[403] (${tenant.name} ${token.slice(-5)}), ${new Date().toISOString()}`,
-                  response.headers.toJSON(),
-                );
-              }
             },
           ],
         },
@@ -62,6 +51,11 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
       cache.delete(search);
 
       if (error instanceof HTTPError) {
+        console.log(
+          `[403] (${tenant.name} ${token.slice(-5)}), ${new Date().toISOString()}`,
+          error.response.headers.toJSON(),
+        );
+
         console.log(
           `[Twitter Api HTTPError] (${tenant.name} ${token.slice(-5)}) ${error.response.status}  ${error.response.statusText}`,
         );
