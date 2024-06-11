@@ -1,29 +1,16 @@
 import { Hono } from "hono";
 import ms from "pretty-ms";
 import ky, { HTTPError } from "ky";
-import chalk from "chalk";
 import { config } from "./config";
-import { cache } from "./cache";
+import { cache, cacheStats } from "./cache";
 import { getTenant } from "./tenant";
+import { comaiApi } from "./api/comai";
+import { statsApi } from "./api/stats";
 
-const cStatusCode = (code: number) => (code === 200 ? chalk.green(code) : chalk.red(code));
-const cResTime = (time: number) => {
-  if (time < 4000) return ms(time);
-  if (time < 7000) return chalk.yellow(ms(time));
-  if (time < 8000) return chalk.red(ms(time));
-  return chalk.redBright(ms(time));
-};
-const cSearch = (search: string) => chalk.gray(search);
 const rand = (min: number, max: number): number => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
 
-if (config.tenants.length === 0) {
-  throw new Error("Provide at least one tenant in the .config.json file");
-}
-
-const endpoint = "https://api.twitter.com/2/tweets/search/all";
-const cacheStats = { requests: 0, hits: 0, misses: 0 };
 const invalid = new Map();
 
 const tweets = async (search: string, tenant: (typeof config.tenants)[number]): Promise<any> => {
@@ -41,7 +28,7 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
   const token = tokens[cacheStats.misses++ % tokens.length];
   const promise = new Promise(async (resolve) => {
     try {
-      const data = await ky(endpoint, {
+      const data = await ky("https://api.twitter.com/2/tweets/search/all", {
         searchParams: search,
         headers: {
           authorization: `Bearer ${token}`,
@@ -81,59 +68,33 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
 
 const app = new Hono();
 
-app.get("/", async (c) => {
-  const start = performance.now();
-  const tenant = getTenant(c);
+app.use("/", async (c, next) => {
+  await next();
 
-  // print cache stats every 10 requests
-  if (cacheStats.requests++ % 10 === 0) {
+  // print cache stats every 10 handled requests
+  if (++cacheStats.requests % 10 === 0) {
     const ratio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
 
     console.log(
       `📦 Cache: misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${cache.size}, ttl: ${config.cache.ttl}`,
     );
   }
+});
+
+app.get("/", async (c) => {
+  const start = performance.now();
+  const tenant = getTenant(c);
 
   const { search } = new URL(c.req.url);
   const { data, status } = await tweets(search, tenant);
 
-  console.log(`${cStatusCode(status)} (${tenant.name}) ${cResTime(performance.now() - start)} ${cSearch(search)}`);
+  console.log(`${status} (${tenant.name}) ${ms(performance.now() - start)} ${search}`);
 
   return c.json(data, status);
 });
 
-app.get("/stats", async (c) => {
-  return c.json({
-    ...cacheStats,
-    ratio: `${Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0}%`,
-    size: cache.size,
-    ttl: config.cache.ttl,
-  });
-});
-
-app.get("/coingecko/comai", async (c) => {
-  if (!config.coingeckoApiKey) {
-    return c.json({ message: "Missing COINGECKO_API_KEY" }, 500);
-  }
-
-  if (cache.has("coingecko-comai")) {
-    return c.json(cache.get("coingecko-comai"));
-  }
-
-  const data = await (
-    await fetch("https://api.coingecko.com/api/v3/coins/commune-ai", {
-      method: "GET",
-      headers: {
-        accept: "application/json",
-        "x-cg-api-key": config.coingeckoApiKey,
-      },
-    })
-  ).json();
-
-  cache.set("coingecko-comai", data, { ttl: 10 * 60 * 1000 }); // ttl 10 minutes
-
-  return c.json(data);
-});
+app.get("/stats", statsApi);
+app.get("/coingecko/comai", comaiApi);
 
 export default {
   hostname: "0.0.0.0",
