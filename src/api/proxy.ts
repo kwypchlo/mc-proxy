@@ -122,9 +122,3 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
     );
   }
 };
-
-setInterval(() => {
-  for (const tenant in usage) {
-    console.log("🎯", tenant, JSON.stringify(Object.values(usage[tenant])));
-  }
-}, 5000);
