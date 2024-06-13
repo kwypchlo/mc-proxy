@@ -5,6 +5,7 @@ import { getTenant } from "../tenant";
 import type { Context, Next } from "hono";
 import ms from "pretty-ms";
 import { shuffle } from "lodash-es";
+import { HTTPException } from "hono/http-exception";
 
 const invalid = new Map();
 const usage = {} as Record<string, { [token: string]: number }>;
@@ -39,6 +40,10 @@ const useNextToken = (tenant: (typeof config.tenants)[number]) => {
 };
 
 const tweets = async (search: string, tenant: (typeof config.tenants)[number]): Promise<any> => {
+  if (tenant.tokens.every((token) => invalid.has(token))) {
+    throw new HTTPException(403, { message: `All tokens are invalid for tenant ${tenant.name}` });
+  }
+
   const cached = cache.get(search);
   if (cached instanceof Promise) {
     const { status } = await cached;
@@ -84,6 +89,8 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
 
       return resolve({ data, status: 200 });
     } catch (error) {
+      const usedToken = currentToken === null ? null : (currentToken as ReturnType<typeof useNextToken>).token;
+
       if (currentToken !== null) {
         (currentToken as ReturnType<typeof useNextToken>).releaseToken();
         currentToken = null;
@@ -94,9 +101,9 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
       if (error instanceof HTTPError) {
         console.log(`[Twitter Api HTTPError] (${tenant.name}}) ${error.response.status}  ${error.response.statusText}`);
 
-        // if (error.response.status === 403) {
-        //   invalid.set(token, true);
-        // }
+        if (usedToken !== null && [401, 403].includes(error.response.status)) {
+          invalid.set(usedToken, true);
+        }
 
         return resolve({ data: undefined, status: error.response.status });
       }
@@ -138,5 +145,9 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
     console.log(
       `🔑 Usage: ${JSON.stringify(Object.keys(usage).map((tenant) => [tenant, Object.values(usage[tenant])]))}`,
     );
+
+    if (invalid.size > 0) {
+      console.log(`🚫 Invalid tokens: ${JSON.stringify(Array.from(invalid.keys()), null, 2)}`);
+    }
   }
 };
