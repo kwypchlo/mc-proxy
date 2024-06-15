@@ -99,7 +99,7 @@ const tweets = async (search: string, tenant: (typeof config.tenants)[number]): 
       cache.delete(search);
 
       if (error instanceof HTTPError) {
-        console.log(`[Twitter Api HTTPError] (${tenant.name}}) ${error.response.status}  ${error.response.statusText}`);
+        console.log(`[Twitter Api HTTPError] (${tenant.name}) ${error.response.status}  ${error.response.statusText}`);
 
         if (usedToken !== null && [401, 403].includes(error.response.status)) {
           invalid.set(usedToken, true);
