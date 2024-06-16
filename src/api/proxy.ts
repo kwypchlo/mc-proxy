@@ -25,6 +25,7 @@ const tweets = async (
           async (request) => {
             if (currentToken !== null) {
               currentToken.releaseToken();
+              currentToken = null;
             }
 
             const cached = cache.get(search);
@@ -41,11 +42,6 @@ const tweets = async (
       },
     }).json();
 
-    if (currentToken !== null) {
-      (currentToken as ReturnType<typeof useNextToken>).releaseToken();
-      currentToken = null;
-    }
-
     if (cacheStatus === "miss") {
       cacheStats.misses++;
       cache.set(search, JSON.stringify(data), { ttl: config.cache.ttl });
@@ -56,11 +52,6 @@ const tweets = async (
     return { data, status: 200 };
   } catch (error) {
     const usedToken = currentToken === null ? null : (currentToken as ReturnType<typeof useNextToken>).token;
-
-    if (currentToken !== null) {
-      (currentToken as ReturnType<typeof useNextToken>).releaseToken();
-      currentToken = null;
-    }
 
     if (error instanceof HTTPError) {
       console.log(`[Twitter Api HTTPError] (${tenant.name}) ${error.response.status}  ${error.response.statusText}`);
@@ -75,6 +66,11 @@ const tweets = async (
     console.log(`[Error] (${tenant.name}) ${String(error)}`);
 
     return { data: undefined, status: 500 };
+  } finally {
+    if (currentToken !== null) {
+      (currentToken as ReturnType<typeof useNextToken>).releaseToken();
+      currentToken = null;
+    }
   }
 };
 
