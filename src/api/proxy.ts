@@ -10,7 +10,7 @@ import { rand } from "../utils";
 const tweets = async (
   search: string,
   tenant: (typeof config.tenants)[number],
-): Promise<{ data: any; status: StatusCode }> => {
+): Promise<{ data: any; status: StatusCode; cacheStatus: string }> => {
   let currentToken: null | ReturnType<typeof useNextToken> = null;
   let cacheStatus: "miss" | "hit" = "miss";
 
@@ -49,7 +49,7 @@ const tweets = async (
       cacheStats.hits++;
     }
 
-    return { data, status: 200 };
+    return { data, status: 200, cacheStatus };
   } catch (error) {
     const usedToken = currentToken === null ? null : (currentToken as ReturnType<typeof useNextToken>).token;
 
@@ -60,12 +60,12 @@ const tweets = async (
         invalidTokens.set(usedToken, true);
       }
 
-      return { data: undefined, status: error.response.status as StatusCode };
+      return { data: undefined, status: error.response.status as StatusCode, cacheStatus };
     }
 
     console.log(`[Error] (${tenant.name}) ${String(error)}`);
 
-    return { data: undefined, status: 500 };
+    return { data: undefined, status: 500, cacheStatus };
   } finally {
     if (currentToken !== null) {
       (currentToken as ReturnType<typeof useNextToken>).releaseToken();
@@ -79,10 +79,10 @@ export const proxyApi = async (c: Context) => {
   const tenant = getTenant(c);
 
   const { search, searchParams } = new URL(c.req.url);
-  const { data, status } = await tweets(search, tenant);
+  const { data, status, cacheStatus } = await tweets(search, tenant);
 
   console.log(
-    `${status} (${tenant.name}) ${ms(performance.now() - start, {}).padEnd(5)} ${status === 200 ? `${searchParams.get("query")}` : search}`,
+    `${status} (${tenant.name}) ${ms(performance.now() - start, {}).padEnd(5)} ${cacheStatus.padEnd(4)} ${status === 200 ? `${searchParams.get("query")}` : search}`,
   );
 
   return c.json(data, status);
