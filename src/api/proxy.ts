@@ -78,10 +78,12 @@ export const proxyApi = async (c: Context) => {
   const start = performance.now();
   const tenant = getTenant(c);
 
-  const { search } = new URL(c.req.url);
+  const { search, searchParams } = new URL(c.req.url);
   const { data, status } = await tweets(search, tenant);
 
-  console.log(`${status} (${tenant.name}) ${ms(performance.now() - start)} ${search}`);
+  console.log(
+    `${status} (${tenant.name}) ${ms(performance.now() - start)} ${status === 200 ? `?query=${searchParams.get("query")}&…` : search}`,
+  );
 
   return c.json(data, status);
 };
