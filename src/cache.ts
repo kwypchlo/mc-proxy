@@ -35,7 +35,11 @@ class Cache {
 
   public async set(key: string, value: string) {
     if (this.isRedisReady) {
-      await this.client.set(key, value, { EX: Math.floor(config.cache.ttl / 1000) });
+      try {
+        await this.client.set(key, value, { EX: Math.floor(config.cache.ttl / 1000) });
+      } catch (err) {
+        console.log(`🔥 Redis: ${String(err)}`);
+      }
     }
 
     memCache.set(key, value, { ttl: config.cache.ttl });

@@ -18,7 +18,7 @@ const tweets = async (
     const data = await ky("https://api.twitter.com/2/tweets/search/all", {
       searchParams: search,
       headers: { "user-agent": "v2FullArchiveSearchPython" },
-      retry: { limit: 10, delay: () => rand(1000, 1500) },
+      retry: { limit: 15, delay: () => rand(500, 1000) },
       timeout: 15 * 1000, // 15 seconds timeout
       hooks: {
         beforeRequest: [
@@ -44,7 +44,7 @@ const tweets = async (
 
     if (cacheStatus === "miss") {
       cacheStats.misses++;
-      await cache.set(search, JSON.stringify(data));
+      cache.set(search, JSON.stringify(data));
     } else if (cacheStatus === "hit") {
       cacheStats.hits++;
     }
