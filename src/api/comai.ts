@@ -1,14 +1,16 @@
 import type { Context } from "hono";
-import { cache } from "../cache";
 import { config } from "../config";
+import TTLCache from "@isaacs/ttlcache";
+
+const memCache = new TTLCache<string, string>({ ttl: 10 * 60 * 1000, checkAgeOnGet: true }); // ttl 10 minutes
 
 export const comaiApi = async (c: Context) => {
   if (!config.coingeckoApiKey) {
     return c.json({ message: "Missing COINGECKO_API_KEY" }, 500);
   }
 
-  if (cache.has("coingecko-comai")) {
-    return c.json(cache.get("coingecko-comai"));
+  if (memCache.has("coingecko-comai")) {
+    return c.json(memCache.get("coingecko-comai"));
   }
 
   const data = await (
@@ -21,7 +23,7 @@ export const comaiApi = async (c: Context) => {
     })
   ).json();
 
-  cache.set("coingecko-comai", data, { ttl: 10 * 60 * 1000 }); // ttl 10 minutes
+  memCache.set("coingecko-comai", data);
 
   return c.json(data);
 };

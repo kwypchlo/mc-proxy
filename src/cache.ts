@@ -1,5 +1,46 @@
 import TTLCache from "@isaacs/ttlcache";
+import { createClient } from "redis";
 import { config } from "./config";
 
-export const cache = new TTLCache<string, string>({ ttl: config.cache.ttl, checkAgeOnGet: true });
+export const memCache = new TTLCache<string, string>({ ttl: config.cache.ttl, checkAgeOnGet: true });
 export const cacheStats = { requests: 0, hits: 0, misses: 0 };
+
+class Cache {
+  private client = createClient(config.redis);
+
+  constructor() {
+    if (config.redis) {
+      this.client.on("error", (err) => console.log(`🔥 Redis: ${String(err)}`)).connect();
+    }
+  }
+
+  get isRedisReady() {
+    return this.client.isReady;
+  }
+
+  public async get(key: string) {
+    if (this.isRedisReady) {
+      return this.client.get(key);
+    }
+
+    return memCache.get(key) ?? null;
+  }
+
+  public async set(key: string, value: string) {
+    if (this.isRedisReady) {
+      await this.client.set(key, value, { EX: Math.floor(config.cache.ttl / 1000) });
+    }
+
+    memCache.set(key, value, { ttl: config.cache.ttl });
+  }
+
+  public async size() {
+    if (this.isRedisReady) {
+      return this.client.dbSize();
+    }
+
+    return memCache.size;
+  }
+}
+
+export const cache = new Cache();
