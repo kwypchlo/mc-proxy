@@ -19,11 +19,18 @@ class Cache {
   }
 
   public async get(key: string) {
+    const cached = memCache.get(key);
+
+    // check if the value is cached in memory first to avoid the network call
+    if (cached === "string") {
+      return cached;
+    }
+
     if (this.isRedisReady) {
       return this.client.get(key);
     }
 
-    return memCache.get(key) ?? null;
+    return null;
   }
 
   public async set(key: string, value: string) {
