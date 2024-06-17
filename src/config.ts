@@ -12,6 +12,11 @@ const configSchema = z.object({
   cache: z.object({
     ttl: z.number().default(60000),
   }),
+  redis: z
+    .object({
+      url: z.string().url(),
+    })
+    .optional(),
   coingeckoApiKey: z.string().optional(),
 });
 

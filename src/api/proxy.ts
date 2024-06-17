@@ -28,7 +28,7 @@ const tweets = async (
               currentToken = null;
             }
 
-            const cached = cache.get(search);
+            const cached = await cache.get(search);
             if (typeof cached === "string") {
               cacheStatus = "hit";
               return Response.json(JSON.parse(cached));
@@ -44,7 +44,7 @@ const tweets = async (
 
     if (cacheStatus === "miss") {
       cacheStats.misses++;
-      cache.set(search, JSON.stringify(data), { ttl: config.cache.ttl });
+      await cache.set(search, JSON.stringify(data));
     } else if (cacheStatus === "hit") {
       cacheStats.hits++;
     }
@@ -89,12 +89,12 @@ export const proxyApi = async (c: Context) => {
 export const proxyApiMiddleware = async (c: Context, next: Next) => {
   await next();
 
-  // print cache stats every 10 handled requests
-  if (++cacheStats.requests % 10 === 0) {
+  // print cache stats every 50 handled requests
+  if (++cacheStats.requests % 50 === 0) {
     const ratio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
 
     console.log(
-      `📦 Cache: misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${cache.size}, ttl: ${config.cache.ttl}`,
+      `📦 Cache: redis ${cache.isRedisReady ? "ok" : "no"}, misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${await cache.size()}, ttl: ${config.cache.ttl}`,
     );
 
     console.log(
