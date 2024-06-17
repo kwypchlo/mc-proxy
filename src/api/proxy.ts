@@ -18,7 +18,7 @@ const tweets = async (
     const data = await ky("https://api.twitter.com/2/tweets/search/all", {
       searchParams: search,
       headers: { "user-agent": "v2FullArchiveSearchPython" },
-      retry: { limit: 15, delay: () => rand(500, 1000) },
+      retry: { limit: 15, delay: (attempt) => [250, 500, rand(500, 1000)][Math.min(attempt - 1, 2)] },
       timeout: 15 * 1000, // 15 seconds timeout
       hooks: {
         beforeRequest: [
