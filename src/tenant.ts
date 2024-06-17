@@ -2,6 +2,10 @@ import type { Context } from "hono";
 import { getConnInfo } from "hono/bun";
 import { config } from "./config";
 import { HTTPException } from "hono/http-exception";
+import { shuffle } from "lodash-es";
+
+export const invalidTokens = new Map();
+export const pendingTokens = {} as Record<string, { [token: string]: number }>;
 
 export const getTenant = (c: Context) => {
   const connInfo = getConnInfo(c);
@@ -26,9 +30,37 @@ export const getTenant = (c: Context) => {
     throw new HTTPException(403, { message: `No tokens found for tenant ${tenant.name}` });
   }
 
-  return tenant;
+  if (tenant.tokens.every((token) => invalidTokens.has(token))) {
+    throw new HTTPException(403, { message: `All tokens are invalid for tenant ${tenant.name}` });
+  }
 
-  //   if (tenant.tokens.every((token) => invalid.has(token))) {
-  //     return c.json({ data: `Twitter Api Forbidden` }, 403);
-  //   }
+  return tenant;
+};
+
+export const useNextToken = (tenant: (typeof config.tenants)[number]) => {
+  const tokens = shuffle(tenant.tokens.filter((token) => invalidTokens.has(token) === false));
+  let selected = tokens[0];
+
+  for (const token of tokens) {
+    if (!(tenant.name in pendingTokens)) {
+      pendingTokens[tenant.name] = {};
+    }
+
+    if (!(token in pendingTokens[tenant.name])) {
+      pendingTokens[tenant.name][token] = 0;
+    }
+
+    if (pendingTokens[tenant.name][token] < pendingTokens[tenant.name][selected]) {
+      selected = token;
+    }
+  }
+
+  pendingTokens[tenant.name][selected]++;
+
+  return {
+    token: selected,
+    releaseToken: () => {
+      pendingTokens[tenant.name][selected]--;
+    },
+  };
 };
