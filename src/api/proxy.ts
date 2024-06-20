@@ -6,6 +6,7 @@ import type { Context, Next } from "hono";
 import ms from "pretty-ms";
 import type { StatusCode } from "hono/utils/http-status";
 import { rand } from "../utils";
+import { isEqual } from "lodash-es";
 
 type ApiTweet = {
   author_id: string;
@@ -25,15 +26,58 @@ type ApiTweetResponse = {
   };
 };
 
+const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetResponse => {
+  if (more.meta.result_count === 0) {
+    return cached;
+  }
+
+  const tweets = more.data!.slice(); // clone array
+
+  if (cached.meta.result_count > 0) {
+    for (const cachedTweet of cached.data!) {
+      const existing = tweets.find(({ id }) => id === cachedTweet.id);
+      if (existing && isEqual(existing, cachedTweet)) {
+        continue; // skip overlapping tweets (can happen when race condition with other tenants fetching same data)
+      }
+
+      if (existing && !isEqual(existing, cachedTweet)) {
+        throw new Error(`Found duplicate tweet ${cachedTweet.id} in more data and its different`);
+      }
+
+      const edited = tweets.some(({ edit_history_tweet_ids }) => edit_history_tweet_ids.includes(cachedTweet.id));
+
+      if (edited) {
+        throw new Error(`✍🏼 [Warning] Found edited tweet ${cachedTweet.id} in more data`);
+      }
+
+      tweets.push(cachedTweet);
+
+      if (tweets.length === 50) break;
+    }
+  }
+
+  const tweetsSlice = tweets.slice(0, 50); // ensure limit to 50 tweets
+
+  return {
+    data: tweetsSlice,
+    meta: {
+      newest_id: tweetsSlice[0].id,
+      oldest_id: tweetsSlice[tweetsSlice.length - 1].id,
+      result_count: tweetsSlice.length,
+    },
+  };
+};
+
 const tweets = async (
   search: string,
   tenant: (typeof config.tenants)[number],
-): Promise<{ data: any; status: StatusCode; cacheStatus: string }> => {
+): Promise<{ data?: ApiTweetResponse; status: StatusCode; cacheStatus: string }> => {
+  const cacheCap = 24 * 60 * 60; // 24 hours
   let currentToken: null | ReturnType<typeof useNextToken> = null;
-  let cacheStatus: "miss" | "hit" = "miss";
+  let cacheStatus: "miss" | "hit" | "more" = "miss";
 
   try {
-    const data: ApiTweetResponse = await ky("https://api.twitter.com/2/tweets/search/all", {
+    let data: ApiTweetResponse = await ky("https://api.twitter.com/2/tweets/search/all", {
       searchParams: search,
       headers: { "user-agent": "v2FullArchiveSearchPython" },
       retry: { limit: 15, delay: (attempt) => [250, 500, rand(500, 1000)][Math.min(attempt - 1, 2)] },
@@ -46,10 +90,26 @@ const tweets = async (
               currentToken = null;
             }
 
-            const cached = await cache.get(search);
+            const [cached, ttl] = await Promise.all([cache.get(search), cache.ttl(search)]);
             if (typeof cached === "string") {
-              cacheStatus = "hit";
-              return Response.json(JSON.parse(cached));
+              const data: ApiTweetResponse = JSON.parse(cached);
+
+              if (cacheCap - ttl > config.cache.ttl) {
+                cacheStatus = "hit";
+
+                return Response.json(data);
+              } else if (data.meta.newest_id) {
+                cacheStatus = "more";
+
+                const prevRequest = request.clone();
+                const requestUrl = new URL(prevRequest.url);
+                requestUrl.searchParams.set("since_id", data.meta.newest_id);
+                requestUrl.searchParams.delete("start_time");
+
+                request = new Request(requestUrl, {
+                  headers: prevRequest.headers,
+                });
+              }
             }
 
             currentToken = useNextToken(tenant);
@@ -62,9 +122,27 @@ const tweets = async (
 
     if (cacheStatus === "miss") {
       cacheStats.misses++;
-      cache.set(search, JSON.stringify(data));
+      cache.set(search, JSON.stringify(data), cacheCap);
     } else if (cacheStatus === "hit") {
       cacheStats.hits++;
+    } else if (cacheStatus === "more") {
+      cacheStats.misses++;
+
+      try {
+        const cached = await cache.get(search);
+
+        if (typeof cached !== "string") {
+          throw new Error(`Cache miss for more - this should not happen!`);
+        }
+
+        data = mergeMore(JSON.parse(cached) as ApiTweetResponse, data);
+
+        cache.set(search, JSON.stringify(data), cacheCap);
+      } catch (error) {
+        await cache.redisClient.del(search);
+
+        return tweets(search, tenant);
+      }
     }
 
     return { data, status: 200, cacheStatus };
