@@ -7,6 +7,24 @@ import ms from "pretty-ms";
 import type { StatusCode } from "hono/utils/http-status";
 import { rand } from "../utils";
 
+type ApiTweet = {
+  author_id: string;
+  created_at: string;
+  edit_history_tweet_ids: string[];
+  id: string;
+  text: string;
+};
+
+type ApiTweetResponse = {
+  data?: ApiTweet[];
+  meta: {
+    newest_id?: string;
+    next_token?: string;
+    oldest_id?: string;
+    result_count: number;
+  };
+};
+
 const tweets = async (
   search: string,
   tenant: (typeof config.tenants)[number],
@@ -15,7 +33,7 @@ const tweets = async (
   let cacheStatus: "miss" | "hit" = "miss";
 
   try {
-    const data = await ky("https://api.twitter.com/2/tweets/search/all", {
+    const data: ApiTweetResponse = await ky("https://api.twitter.com/2/tweets/search/all", {
       searchParams: search,
       headers: { "user-agent": "v2FullArchiveSearchPython" },
       retry: { limit: 15, delay: (attempt) => [250, 500, rand(500, 1000)][Math.min(attempt - 1, 2)] },
