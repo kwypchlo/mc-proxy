@@ -10,7 +10,7 @@ const configSchema = z.object({
     }),
   ),
   cache: z.object({
-    ttl: z.number().default(60000),
+    ttl: z.number().int().nonnegative().default(100), // default to 100 seconds
   }),
   redis: z
     .object({
