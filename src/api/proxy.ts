@@ -28,6 +28,8 @@ type ApiTweetResponse = {
 
 const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetResponse => {
   if (more.meta.result_count === 0) {
+    console.log(`[Cache more] Tried to fetch more tweets but none were added, returning cached data`);
+
     return cached;
   }
 
@@ -47,7 +49,7 @@ const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetRe
       const edited = tweets.some(({ edit_history_tweet_ids }) => edit_history_tweet_ids.includes(cachedTweet.id));
 
       if (edited) {
-        throw new Error(`✍🏼 [Warning] Found edited tweet ${cachedTweet.id} in more data`);
+        throw new Error(`Found edited tweet ${cachedTweet.id} in more data`);
       }
 
       tweets.push(cachedTweet);
@@ -55,6 +57,8 @@ const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetRe
       if (tweets.length === 50) break;
     }
   }
+
+  console.log(`[Cache more] Found ${more.data!.length} new tweets for cached query, returning merged data`);
 
   const tweetsSlice = tweets.slice(0, 50); // ensure limit to 50 tweets
 
@@ -139,6 +143,8 @@ const tweets = async (
 
         cache.set(search, JSON.stringify(data), cacheCap);
       } catch (error) {
+        console.log(`[Cache more] ${String(error)}, fetching fresh data`);
+
         await cache.redisClient.del(search);
 
         return tweets(search, tenant);
