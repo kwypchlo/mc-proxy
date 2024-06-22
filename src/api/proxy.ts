@@ -118,6 +118,8 @@ const tweets = async (
             currentToken = useNextToken(tenant);
 
             request.headers.set("authorization", `Bearer ${currentToken.token}`);
+
+            return request;
           },
         ],
       },
