@@ -98,8 +98,6 @@ const tweets = async (
             if (typeof cached === "string") {
               const data: ApiTweetResponse = JSON.parse(cached);
 
-              console.log(`[Cache] Found data with ttl ${ttl} (cacheCap ${cacheCap}, config.ttl ${config.cache.ttl})`);
-
               if (cacheCap - config.cache.ttl < ttl) {
                 cacheStatus = "hit";
 
