@@ -100,7 +100,7 @@ const tweets = async (
 
               console.log(`[Cache] Found data with ttl ${ttl} (cacheCap ${cacheCap}, config.ttl ${config.cache.ttl})`);
 
-              if (cacheCap - config.cache.ttl > ttl) {
+              if (cacheCap - config.cache.ttl < ttl) {
                 cacheStatus = "hit";
 
                 return Response.json(data);
