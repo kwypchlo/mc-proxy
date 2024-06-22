@@ -158,7 +158,9 @@ const tweets = async (
     const usedToken = currentToken === null ? null : (currentToken as ReturnType<typeof useNextToken>).token;
 
     if (error instanceof HTTPError) {
-      console.log(`[Twitter Api HTTPError] (${tenant.name}) ${error.response.status}  ${error.response.statusText}`);
+      const message = error.response.text ? await error.response.text() : "";
+
+      console.log(`[Twitter Error] (${tenant.name}) ${error.response.status} ${error.response.statusText} ${message}`);
 
       if (usedToken !== null && [401, 403].includes(error.response.status)) {
         invalidTokens.set(usedToken, true);
