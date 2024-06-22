@@ -148,7 +148,6 @@ const tweets = async (
       return { data: undefined, status: error.response.status as StatusCode, cacheStatus };
     } else if (error instanceof z.ZodError) {
       console.log(`${chalk.red("[Response Validaton Error]")} (${tenant.name}) ${JSON.stringify(error.format())}`);
-      console.log(`${chalk.red("[Response Validaton Error]")} (${tenant.name}) ${JSON.stringify(error.flatten())}`);
     } else {
       console.log(`[Error] (${tenant.name}) ${String(error)}`);
     }
