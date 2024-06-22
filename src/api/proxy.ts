@@ -6,7 +6,6 @@ import type { Context, Next } from "hono";
 import ms from "pretty-ms";
 import type { StatusCode } from "hono/utils/http-status";
 import { rand } from "../utils";
-import { isEqual } from "lodash-es";
 
 type ApiTweet = {
   author_id: string;
@@ -28,46 +27,27 @@ type ApiTweetResponse = {
 
 const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetResponse => {
   if (more.meta.result_count === 0) {
-    console.log(`[Cache more] Tried to fetch more tweets but none were added, returning cached data`);
+    console.log(`[Cache more] Fetched more tweets but result returned empty, returning cached data`);
 
     return cached;
   }
 
-  const tweets = more.data!.slice(); // clone array
+  const newTweets = more.data!.slice(); // clone new tweets
+  const newTweetsIds = new Set(newTweets.flatMap(({ edit_history_tweet_ids }) => edit_history_tweet_ids));
+  const cachedTweets = cached.data!.filter(({ id }) => newTweetsIds.has(id) === false); // filter edited tweets
+  const newTweetsSlice = newTweets.concat(cachedTweets).slice(0, 50); // limit to 50 tweets
 
-  if (tweets.length < 50 && cached.meta.result_count > 0) {
-    for (const cachedTweet of cached.data!) {
-      const existing = tweets.find(({ id }) => id === cachedTweet.id);
-      if (existing && isEqual(existing, cachedTweet)) {
-        continue; // skip overlapping tweets (can happen when race condition with other tenants fetching same data)
-      }
+  console.log(`[Cache more] Fetched ${more.meta.result_count} new tweets for cached query, returning merged data`);
 
-      if (existing && !isEqual(existing, cachedTweet)) {
-        throw new Error(`Found duplicate tweet ${cachedTweet.id} in more data and its different`);
-      }
-
-      const edited = tweets.some(({ edit_history_tweet_ids }) => edit_history_tweet_ids.includes(cachedTweet.id));
-
-      if (edited) {
-        throw new Error(`Found edited tweet ${cachedTweet.id} in more data`);
-      }
-
-      tweets.push(cachedTweet);
-
-      if (tweets.length === 50) break;
-    }
-  }
-
-  console.log(`[Cache more] Found ${more.data!.length} new tweets for cached query, returning merged data`);
-
-  const tweetsSlice = tweets.slice(0, 50); // ensure limit to 50 tweets
+  cacheStats.retained += 50 - more.meta.result_count; // count retained tweets
+  cacheStats.fetched += more.meta.result_count; // count fetched tweets
 
   return {
-    data: tweetsSlice,
+    data: newTweetsSlice,
     meta: {
-      newest_id: tweetsSlice[0].id,
-      oldest_id: tweetsSlice[tweetsSlice.length - 1].id,
-      result_count: tweetsSlice.length,
+      newest_id: newTweetsSlice[0].id,
+      oldest_id: newTweetsSlice[newTweetsSlice.length - 1].id,
+      result_count: newTweetsSlice.length,
     },
   };
 };
@@ -125,29 +105,23 @@ const tweets = async (
 
     if (cacheStatus === "miss") {
       cacheStats.misses++;
+      cacheStats.fetched += data.meta.result_count; // count fetched tweets
       cache.set(search, JSON.stringify(data), cacheCap);
     } else if (cacheStatus === "hit") {
       cacheStats.hits++;
     } else if (cacheStatus === "more") {
       cacheStats.misses++;
 
-      try {
-        const cached = await cache.get(search);
-
-        if (typeof cached !== "string") {
-          throw new Error(`Cache miss for more - this should not happen!`);
-        }
-
-        data = mergeMore(JSON.parse(cached) as ApiTweetResponse, data);
-
-        cache.set(search, JSON.stringify(data), cacheCap);
-      } catch (error) {
-        console.log(`[Cache more] ${String(error)}, fetching fresh data`);
-
-        await cache.redisClient.del(search);
+      const cached = await cache.get(search);
+      if (typeof cached !== "string") {
+        console.log(`[Error] Cache miss for more - this should not happen!`);
 
         return tweets(search, tenant);
       }
+
+      data = mergeMore(JSON.parse(cached) as ApiTweetResponse, data);
+
+      cache.set(search, JSON.stringify(data), cacheCap);
     }
 
     return { data, status: 200, cacheStatus };
@@ -196,14 +170,19 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
 
   // print cache stats every 50 handled requests
   if (++cacheStats.requests % 50 === 0) {
-    const ratio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
+    const cacheRatio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
+    const retainRatio = Math.floor((cacheStats.retained / (cacheStats.fetched + cacheStats.retained)) * 100) || 0;
 
     console.log(
-      `📦 Cache: redis ${cache.redisClient.isReady ? "ok" : "no"}, misses ${cacheStats.misses}, hits ${cacheStats.hits} (${ratio}%), size ${await cache.size()}, ttl: ${config.cache.ttl}`,
+      `📦 Cache: redis ${cache.redisClient.isReady ? "ok" : "no"}, misses ${cacheStats.misses}, hits ${cacheStats.hits} (${cacheRatio}%), size ${await cache.size()}, ttl: ${config.cache.ttl}`,
     );
 
     console.log(
-      `🔑 Usage: ${JSON.stringify(Object.keys(pendingTokens).map((tenant) => [tenant, Object.values(pendingTokens[tenant])]))}`,
+      `📊 Tweets: fetched ${cacheStats.fetched}, retained ${cacheStats.retained} (${retainRatio}%), total ${cacheStats.fetched + cacheStats.retained} tweets`,
+    );
+
+    console.log(
+      `🔑 Api keys in use: ${JSON.stringify(Object.keys(pendingTokens).map((tenant) => [tenant, Object.values(pendingTokens[tenant])]))}`,
     );
 
     if (invalidTokens.size > 0) {

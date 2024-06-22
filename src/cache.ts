@@ -3,7 +3,7 @@ import { createClient } from "redis";
 import { config } from "./config";
 
 export const memCache = new TTLCache<string, string>({ ttl: config.cache.ttl, checkAgeOnGet: true });
-export const cacheStats = { requests: 0, hits: 0, misses: 0 };
+export const cacheStats = { requests: 0, hits: 0, misses: 0, fetched: 0, retained: 0 };
 
 class Cache {
   public redisClient = createClient(config.redis);
