@@ -86,11 +86,14 @@ const tweets = async (
               } else if (data.meta.newest_id) {
                 cacheStatus = "more";
 
-                const requestUrl = new URL(request.url);
+                const prevRequest = request.clone();
+                const requestUrl = new URL(prevRequest.url);
                 requestUrl.searchParams.set("since_id", data.meta.newest_id);
                 requestUrl.searchParams.delete("start_time");
 
                 request = new Request(requestUrl.toString());
+
+                console.log(chalk.yellow(JSON.stringify({ prev: prevRequest.url, next: request.url }, null, 2)));
               }
             }
 
