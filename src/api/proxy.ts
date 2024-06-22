@@ -107,8 +107,7 @@ const tweets = async (
               } else if (data.meta.newest_id) {
                 cacheStatus = "more";
 
-                const prevRequest = request.clone();
-                const requestUrl = new URL(prevRequest.url);
+                const requestUrl = new URL(request.url);
                 requestUrl.searchParams.set("since_id", data.meta.newest_id);
                 requestUrl.searchParams.delete("start_time");
 
