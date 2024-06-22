@@ -107,7 +107,8 @@ const tweets = async (
     if (cacheStatus === "miss") {
       cacheStats.misses++;
       cacheStats.fetched += data.meta.result_count; // count fetched tweets
-      cache.set(search, JSON.stringify(data), cacheCap);
+
+      await cache.set(search, JSON.stringify(data), cacheCap);
     } else if (cacheStatus === "hit") {
       cacheStats.hits++;
     } else if (cacheStatus === "more") {
@@ -122,7 +123,7 @@ const tweets = async (
 
       data = mergeMore(JSON.parse(cached) as ApiTweetResponse, data);
 
-      cache.set(search, JSON.stringify(data), cacheCap);
+      await cache.set(search, JSON.stringify(data), cacheCap);
     }
 
     return { data, status: 200, cacheStatus };
