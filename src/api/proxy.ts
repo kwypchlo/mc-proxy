@@ -112,9 +112,7 @@ const tweets = async (
                 requestUrl.searchParams.set("since_id", data.meta.newest_id);
                 requestUrl.searchParams.delete("start_time");
 
-                request = new Request(requestUrl, {
-                  headers: prevRequest.headers,
-                });
+                request = new Request(requestUrl.toString());
               }
             }
 
