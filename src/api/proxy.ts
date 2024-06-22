@@ -7,24 +7,27 @@ import ms from "pretty-ms";
 import type { StatusCode } from "hono/utils/http-status";
 import chalk from "chalk";
 import { rand } from "../utils";
+import z from "zod";
 
-type ApiTweet = {
-  author_id: string;
-  created_at: string;
-  edit_history_tweet_ids: string[];
-  id: string;
-  text: string;
-};
+const zTweet = z.object({
+  author_id: z.string().min(1),
+  created_at: z.string().min(1),
+  edit_history_tweet_ids: z.array(z.string()).nonempty(),
+  id: z.string().min(1),
+  text: z.string().min(1),
+});
 
-type ApiTweetResponse = {
-  data?: ApiTweet[];
-  meta: {
-    newest_id?: string;
-    next_token?: string;
-    oldest_id?: string;
-    result_count: number;
-  };
-};
+const zTweetResponse = z.object({
+  data: z.array(zTweet).optional(),
+  meta: z.object({
+    newest_id: z.string().optional(),
+    next_token: z.string().optional(),
+    oldest_id: z.string().optional(),
+    result_count: z.number().int().nonnegative(),
+  }),
+});
+
+type ApiTweetResponse = z.infer<typeof zTweetResponse>;
 
 const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetResponse => {
   if (more.meta.result_count === 0) {
@@ -105,6 +108,8 @@ const tweets = async (
       },
     }).json();
 
+    zTweetResponse.parse(data); // validate response
+
     if (cacheStatus === "miss") {
       cacheStats.misses++;
       cacheStats.fetched += data.meta.result_count; // count fetched tweets
@@ -158,7 +163,7 @@ export const proxyApi = async (c: Context) => {
   const start = performance.now();
   const tenant = getTenant(c);
 
-  const { search, searchParams } = new URL(c.req.url);
+  const { search } = new URL(c.req.url);
   const { data, status, cacheStatus } = await tweets(search, tenant);
 
   console.log(
