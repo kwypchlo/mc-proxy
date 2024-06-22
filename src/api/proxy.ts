@@ -5,6 +5,7 @@ import { getTenant, invalidTokens, useNextToken, pendingTokens } from "../tenant
 import type { Context, Next } from "hono";
 import ms from "pretty-ms";
 import type { StatusCode } from "hono/utils/http-status";
+import chalk from "chalk";
 import { rand } from "../utils";
 
 type ApiTweet = {
@@ -159,7 +160,7 @@ export const proxyApi = async (c: Context) => {
   const { data, status, cacheStatus } = await tweets(search, tenant);
 
   console.log(
-    `${status} (${tenant.name}) ${ms(performance.now() - start, {}).padEnd(5)} ${cacheStatus.padEnd(4)} ${status === 200 ? `${searchParams.get("query")}` : search}`,
+    `${status} (${tenant.name}) ${ms(performance.now() - start, {}).padEnd(5)} ${cacheStatus.padEnd(4)} ${chalk.gray(status === 200 ? searchParams.get("query") : search)}`,
   );
 
   return c.json(data, status);
