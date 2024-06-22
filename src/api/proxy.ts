@@ -92,8 +92,6 @@ const tweets = async (
                 requestUrl.searchParams.delete("start_time");
 
                 request = new Request(requestUrl.toString());
-
-                console.log(chalk.yellow(JSON.stringify({ prev: prevRequest.url, next: request.url }, null, 2)));
               }
             }
 
@@ -164,7 +162,7 @@ export const proxyApi = async (c: Context) => {
   const { data, status, cacheStatus } = await tweets(search, tenant);
 
   console.log(
-    `${status} (${tenant.name}) ${ms(performance.now() - start, {}).padEnd(5)} ${cacheStatus.padEnd(4)} ${chalk.gray(status === 200 ? searchParams.get("query") : search)}`,
+    `${status} (${tenant.name}) ${ms(performance.now() - start, {}).padEnd(5)} ${cacheStatus.padEnd(4)} ${chalk.gray(search)}`,
   );
 
   return c.json(data, status);
