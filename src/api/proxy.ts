@@ -98,7 +98,7 @@ const tweets = async (
             if (typeof cached === "string") {
               const data: ApiTweetResponse = JSON.parse(cached);
 
-              if (cacheCap - ttl > config.cache.ttl) {
+              if (cacheCap - config.cache.ttl > ttl) {
                 cacheStatus = "hit";
 
                 return Response.json(data);
