@@ -146,9 +146,11 @@ const tweets = async (
       }
 
       return { data: undefined, status: error.response.status as StatusCode, cacheStatus };
+    } else if (error instanceof z.ZodError) {
+      console.log(`[Error] (${tenant.name}) ${error.flatten()}`);
+    } else {
+      console.log(`[Error] (${tenant.name}) ${String(error)}`);
     }
-
-    console.log(`[Error] (${tenant.name}) ${String(error)}`);
 
     return { data: undefined, status: 500, cacheStatus };
   } finally {
