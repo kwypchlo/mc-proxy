@@ -35,7 +35,7 @@ const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetRe
 
   const tweets = more.data!.slice(); // clone array
 
-  if (cached.meta.result_count > 0) {
+  if (tweets.length < 50 && cached.meta.result_count > 0) {
     for (const cachedTweet of cached.data!) {
       const existing = tweets.find(({ id }) => id === cachedTweet.id);
       if (existing && isEqual(existing, cachedTweet)) {
