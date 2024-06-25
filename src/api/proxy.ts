@@ -60,7 +60,6 @@ const tweets = async (
   search: string,
   tenant: (typeof config.tenants)[number],
 ): Promise<{ data?: ApiTweetResponse; status: StatusCode; cacheStatus: string }> => {
-  const cacheCap = 24 * 60 * 60; // 24 hours
   let currentToken: null | ReturnType<typeof useNextToken> = null;
   let cacheStatus: "miss" | "hit" | "more" = "miss";
 
@@ -82,7 +81,7 @@ const tweets = async (
             if (typeof cached === "string") {
               const data: ApiTweetResponse = JSON.parse(cached);
 
-              if (cacheCap - config.cache.ttl < ttl) {
+              if (config.cache.ttlMax - config.cache.ttl < ttl) {
                 cacheStatus = "hit";
 
                 return Response.json(data);
@@ -114,7 +113,7 @@ const tweets = async (
       cacheStats.misses++;
       cacheStats.fetched += data.meta.result_count; // count fetched tweets
 
-      await cache.set(search, JSON.stringify(data), cacheCap);
+      await cache.set(search, JSON.stringify(data), config.cache.ttlMax);
     } else if (cacheStatus === "hit") {
       cacheStats.hits++;
     } else if (cacheStatus === "more") {
@@ -129,7 +128,7 @@ const tweets = async (
 
       data = mergeMore(JSON.parse(cached) as ApiTweetResponse, data);
 
-      await cache.set(search, JSON.stringify(data), cacheCap);
+      await cache.set(search, JSON.stringify(data), config.cache.ttlMax);
     }
 
     return { data, status: 200, cacheStatus };
@@ -186,11 +185,11 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
     const retainRatio = Math.floor((cacheStats.retained / (cacheStats.fetched + cacheStats.retained)) * 100) || 0;
 
     console.log(
-      `📦 Cache: redis ${cache.redisClient.isReady ? "ok" : "no"}, misses ${cacheStats.misses}, hits ${cacheStats.hits} (${cacheRatio}%), size ${await cache.size()}, ttl: ${config.cache.ttl}`,
+      `📦 Cache: redis ${cache.redisClient.isReady ? "ok" : "no"}, misses ${cacheStats.misses}, hits ${cacheStats.hits} (${cacheRatio}%), size ${await cache.size()}, ttl: ${config.cache.ttl} (${config.cache.ttlMax} max)`,
     );
 
     console.log(
-      `📊 Tweets: fetched ${cacheStats.fetched}, retained ${cacheStats.retained} (${retainRatio}%), total ${cacheStats.fetched + cacheStats.retained} tweets`,
+      `📊 Tweets: fetched ${cacheStats.fetched}, retained ${cacheStats.retained} (${retainRatio}%), total ${cacheStats.fetched + cacheStats.retained} requested`,
     );
 
     console.log(
