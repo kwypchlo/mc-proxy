@@ -31,7 +31,7 @@ type ApiTweetResponse = z.infer<typeof zTweetResponse>;
 
 const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetResponse => {
   if (more.meta.result_count === 0) {
-    console.log(`[Cache more] Fetched more tweets but result returned empty, returning cached data`);
+    // console.log(`[Cache more] Fetched more tweets but result returned empty, returning cached data`);
 
     return cached;
   }
@@ -41,7 +41,7 @@ const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetRe
   const cachedTweets = cached.data!.filter(({ id }) => newTweetsIds.has(id) === false); // filter edited tweets
   const newTweetsSlice = newTweets.concat(cachedTweets).slice(0, 50); // limit to 50 tweets
 
-  console.log(`[Cache more] Fetched ${more.meta.result_count} new tweets for cached query, returning merged data`);
+  // console.log(`[Cache more] Fetched ${more.meta.result_count} new tweets for cached query, returning merged data`);
 
   cacheStats.retained += 50 - more.meta.result_count; // count retained tweets
   cacheStats.fetched += more.meta.result_count; // count fetched tweets
@@ -83,6 +83,12 @@ const tweets = async (
 
               if (config.cache.ttlMax - config.cache.ttl < ttl) {
                 cacheStatus = "hit";
+
+                // if cached data is cached for more than ttl max, limit to ttl max
+                // this can happen when ttl max is reduced and cached data with previous ttl value exists
+                if (ttl > config.cache.ttlMax) {
+                  await cache.expire(search, config.cache.ttlMax);
+                }
 
                 return Response.json(data);
               } else if (data.meta.newest_id) {
