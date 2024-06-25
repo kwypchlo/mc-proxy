@@ -130,9 +130,15 @@ const tweets = async (
         throw new Error("Cached data is null when trying to merge with new data!");
       }
 
-      data = mergeMore(cachedTweetResponse, data);
+      if (data.meta.result_count) {
+        data = mergeMore(cachedTweetResponse, data);
 
-      await cache.set(search, JSON.stringify(data), config.cache.ttlMax);
+        await cache.set(search, JSON.stringify(data), config.cache.ttlMax);
+      } else {
+        data = cachedTweetResponse;
+
+        await cache.expire(search, config.cache.ttlMax);
+      }
     }
 
     return { data, status: 200, cacheStatus };
