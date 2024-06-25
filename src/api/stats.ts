@@ -10,7 +10,7 @@ export const statsApi = async (c: Context) => {
     ...cacheStats,
     ratio: `${cacheRatio}%`,
     retainRatio: `${retainRatio}%`,
-    size: cache.size,
+    size: await cache.size(),
     ttl: config.cache.ttl,
   });
 };
