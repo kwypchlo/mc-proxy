@@ -32,6 +32,18 @@ class Cache {
     return Math.ceil(memCache.getRemainingTTL(key) / 1000) || -2;
   }
 
+  public async expire(key: string, ttl: number) {
+    if (this.redisClient.isReady) {
+      try {
+        await this.redisClient.expire(key, ttl);
+      } catch (err) {
+        console.log(`🔥 Redis: ${String(err)}`);
+      }
+    } else {
+      memCache.setTTL(key, ttl * 1000);
+    }
+  }
+
   public async set(key: string, value: string, ttl?: number) {
     if (this.redisClient.isReady) {
       try {
