@@ -62,6 +62,7 @@ const tweets = async (
 ): Promise<{ data?: ApiTweetResponse; status: StatusCode; cacheStatus: string }> => {
   let currentToken: null | ReturnType<typeof useNextToken> = null;
   let cacheStatus: "miss" | "hit" | "more" = "miss";
+  let cachedTweetResponse: ApiTweetResponse | null = null;
 
   try {
     let data: ApiTweetResponse = await ky("https://api.twitter.com/2/tweets/search/all", {
@@ -79,7 +80,7 @@ const tweets = async (
 
             const [cached, ttl] = await Promise.all([cache.get(search), cache.ttl(search)]);
             if (typeof cached === "string") {
-              const data: ApiTweetResponse = JSON.parse(cached);
+              cachedTweetResponse = JSON.parse(cached) as ApiTweetResponse;
 
               if (config.cache.ttlMax - config.cache.ttl < ttl) {
                 cacheStatus = "hit";
@@ -90,13 +91,13 @@ const tweets = async (
                   await cache.expire(search, config.cache.ttlMax);
                 }
 
-                return Response.json(data);
-              } else if (data.meta.newest_id) {
+                return Response.json(cachedTweetResponse);
+              } else if (cachedTweetResponse.meta.newest_id) {
                 cacheStatus = "more";
 
                 const prevRequest = request.clone();
                 const requestUrl = new URL(prevRequest.url);
-                requestUrl.searchParams.set("since_id", data.meta.newest_id);
+                requestUrl.searchParams.set("since_id", cachedTweetResponse.meta.newest_id);
                 requestUrl.searchParams.delete("start_time");
 
                 request = new Request(requestUrl.toString());
@@ -125,14 +126,11 @@ const tweets = async (
     } else if (cacheStatus === "more") {
       cacheStats.misses++;
 
-      const cached = await cache.get(search);
-      if (typeof cached !== "string") {
-        console.log(`[Error] Cache miss for more - this should not happen!`);
-
-        return tweets(search, tenant);
+      if (cachedTweetResponse === null) {
+        throw new Error("Cached data is null when trying to merge with new data!");
       }
 
-      data = mergeMore(JSON.parse(cached) as ApiTweetResponse, data);
+      data = mergeMore(cachedTweetResponse, data);
 
       await cache.set(search, JSON.stringify(data), config.cache.ttlMax);
     }
