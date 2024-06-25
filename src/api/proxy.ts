@@ -125,7 +125,7 @@ const tweets = async (
     } else if (cacheStatus === "more") {
       cacheStats.misses++;
 
-      const cached = await cache.get(search);
+      const [cached, ttl] = await Promise.all([cache.get(search), cache.ttl(search)]);
       if (typeof cached !== "string") {
         console.log(`[Error] Cache miss for more - this should not happen!`);
 
@@ -134,7 +134,7 @@ const tweets = async (
 
       data = mergeMore(JSON.parse(cached) as ApiTweetResponse, data);
 
-      await cache.set(search, JSON.stringify(data), config.cache.ttlMax);
+      await cache.set(search, JSON.stringify(data), config.cache.ttlMax - ttl);
     }
 
     return { data, status: 200, cacheStatus };
