@@ -1,30 +1,22 @@
 import TTLCache from "@isaacs/ttlcache";
-import { createClient } from "redis";
 import { config } from "./config";
+import { redisClient } from "./redis";
 
 export const memCache = new TTLCache<string, string>({ ttl: config.cache.ttl, checkAgeOnGet: true });
 export const cacheStats = { requests: 0, hits: 0, misses: 0, fetched: 0, retained: 0 };
 
 class Cache {
-  public redisClient = createClient(config.redis);
-
-  constructor() {
-    if (config.redis) {
-      this.redisClient.on("error", (err) => console.log(`🔥 Redis: ${String(err)}`)).connect();
-    }
-  }
-
   public async get(key: string) {
-    if (this.redisClient.isReady) {
-      return this.redisClient.get(key);
+    if (redisClient.status === "ready") {
+      return redisClient.get(key);
     }
 
     return memCache.get(key) ?? null;
   }
 
   public async ttl(key: string) {
-    if (this.redisClient.isReady) {
-      return this.redisClient.ttl(key);
+    if (redisClient.status === "ready") {
+      return redisClient.ttl(key);
     }
 
     // use ceil to round up milliseconds when converting to seconds
@@ -33,9 +25,9 @@ class Cache {
   }
 
   public async expire(key: string, ttl: number) {
-    if (this.redisClient.isReady) {
+    if (redisClient.status === "ready") {
       try {
-        await this.redisClient.expire(key, ttl);
+        await redisClient.expire(key, ttl);
       } catch (err) {
         console.log(`🔥 Redis: ${String(err)}`);
       }
@@ -45,9 +37,9 @@ class Cache {
   }
 
   public async set(key: string, value: string, ttl?: number) {
-    if (this.redisClient.isReady) {
+    if (redisClient.status === "ready") {
       try {
-        await this.redisClient.set(key, value, { EX: ttl ?? config.cache.ttl });
+        await redisClient.set(key, value, "EX", ttl ?? config.cache.ttl);
       } catch (err) {
         console.log(`🔥 Redis: ${String(err)}`);
       }
@@ -57,8 +49,8 @@ class Cache {
   }
 
   public async size() {
-    if (this.redisClient.isReady) {
-      return this.redisClient.dbSize();
+    if (redisClient.status === "ready") {
+      return redisClient.dbsize();
     }
 
     return memCache.size;
