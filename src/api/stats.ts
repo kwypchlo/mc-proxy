@@ -1,16 +1,17 @@
 import type { Context } from "hono";
-import { cache, cacheStats } from "../cache";
+import { stats } from "../stats";
 import { config } from "../config";
+import { redisClient } from "../redis";
 
 export const statsApi = async (c: Context) => {
-  const cacheRatio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
-  const retainRatio = Math.floor((cacheStats.retained / (cacheStats.fetched + cacheStats.retained)) * 100) || 0;
+  const cacheRatio = Math.floor((stats.hits / (stats.hits + stats.misses)) * 100) || 0;
+  const retainRatio = Math.floor((stats.retained / (stats.fetched + stats.retained)) * 100) || 0;
 
   return c.json({
-    ...cacheStats,
+    ...stats,
     ratio: `${cacheRatio}%`,
     retainRatio: `${retainRatio}%`,
-    size: await cache.size(),
+    size: await redisClient.dbsize(),
     ttl: config.cache.ttl,
   });
 };

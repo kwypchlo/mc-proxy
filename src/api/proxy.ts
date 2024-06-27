@@ -1,5 +1,5 @@
 import ky, { HTTPError } from "ky";
-import { cache, cacheStats } from "../cache";
+import { stats } from "../stats";
 import { config } from "../config";
 import { getTenant, invalidTokens, useNextToken, pendingTokens } from "../tenant";
 import type { Context, Next } from "hono";
@@ -44,8 +44,8 @@ const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetRe
 
   // console.log(`[Cache more] Fetched ${more.meta.result_count} new tweets for cached query, returning merged data`);
 
-  cacheStats.retained += 50 - more.meta.result_count; // count retained tweets
-  cacheStats.fetched += more.meta.result_count; // count fetched tweets
+  stats.retained += 50 - more.meta.result_count; // count retained tweets
+  stats.fetched += more.meta.result_count; // count fetched tweets
 
   return {
     data: newTweetsSlice,
@@ -79,7 +79,7 @@ const tweets = async (
               currentToken = null;
             }
 
-            const [cached, ttl] = await Promise.all([cache.get(search), cache.ttl(search)]);
+            const [cached, ttl] = await Promise.all([redisClient.get(search), redisClient.ttl(search)]);
             if (typeof cached === "string") {
               cachedTweetResponse = JSON.parse(cached) as ApiTweetResponse;
 
@@ -89,7 +89,7 @@ const tweets = async (
                 // if cached data is cached for more than ttl max, limit to ttl max
                 // this can happen when ttl max is reduced and cached data with previous ttl value exists
                 if (ttl > config.cache.ttlMax) {
-                  await cache.expire(search, config.cache.ttlMax);
+                  await redisClient.expire(search, config.cache.ttlMax);
                 }
 
                 return Response.json(cachedTweetResponse);
@@ -118,14 +118,14 @@ const tweets = async (
     zTweetResponse.parse(data); // validate response
 
     if (cacheStatus === "miss") {
-      cacheStats.misses++;
-      cacheStats.fetched += data.meta.result_count; // count fetched tweets
+      stats.misses++;
+      stats.fetched += data.meta.result_count; // count fetched tweets
 
-      await cache.set(search, JSON.stringify(data), config.cache.ttlMax);
+      await redisClient.set(search, JSON.stringify(data), "EX", config.cache.ttlMax);
     } else if (cacheStatus === "hit") {
-      cacheStats.hits++;
+      stats.hits++;
     } else if (cacheStatus === "more") {
-      cacheStats.misses++;
+      stats.misses++;
 
       if (cachedTweetResponse === null) {
         throw new Error("Cached data is null when trying to merge with new data!");
@@ -134,11 +134,11 @@ const tweets = async (
       if (data.meta.result_count) {
         data = mergeMore(cachedTweetResponse, data);
 
-        await cache.set(search, JSON.stringify(data), config.cache.ttlMax);
+        await redisClient.set(search, JSON.stringify(data), "EX", config.cache.ttlMax);
       } else {
         data = cachedTweetResponse;
 
-        await cache.expire(search, config.cache.ttlMax);
+        await redisClient.expire(search, config.cache.ttlMax);
       }
     }
 
@@ -191,16 +191,16 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
   await next();
 
   // print cache stats every 50 handled requests
-  if (++cacheStats.requests % 50 === 0) {
-    const cacheRatio = Math.floor((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100) || 0;
-    const retainRatio = Math.floor((cacheStats.retained / (cacheStats.fetched + cacheStats.retained)) * 100) || 0;
+  if (++stats.requests % 50 === 0) {
+    const cacheRatio = Math.floor((stats.hits / (stats.hits + stats.misses)) * 100) || 0;
+    const retainRatio = Math.floor((stats.retained / (stats.fetched + stats.retained)) * 100) || 0;
 
     console.log(
-      `📦 Cache: redis ${redisClient.status}, misses ${cacheStats.misses}, hits ${cacheStats.hits} (${cacheRatio}%), size ${await cache.size()}, ttl: ${config.cache.ttl} (${config.cache.ttlMax} max)`,
+      `📦 Cache: redis ${redisClient.status}, misses ${stats.misses}, hits ${stats.hits} (${cacheRatio}%), size ${await redisClient.dbsize()}, ttl: ${config.cache.ttl} (${config.cache.ttlMax} max)`,
     );
 
     console.log(
-      `📊 Tweets: fetched ${cacheStats.fetched}, retained ${cacheStats.retained} (${retainRatio}%), total ${cacheStats.fetched + cacheStats.retained} requested`,
+      `📊 Tweets: fetched ${stats.fetched}, retained ${stats.retained} (${retainRatio}%), total ${stats.fetched + stats.retained} requested`,
     );
 
     console.log(
