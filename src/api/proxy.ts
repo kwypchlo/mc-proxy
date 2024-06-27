@@ -32,8 +32,6 @@ type ApiTweetResponse = z.infer<typeof zTweetResponse>;
 
 const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetResponse => {
   if (more.meta.result_count === 0) {
-    // console.log(`[Cache more] Fetched more tweets but result returned empty, returning cached data`);
-
     return cached;
   }
 
@@ -41,11 +39,6 @@ const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetRe
   const newTweetsIds = new Set(newTweets.flatMap(({ edit_history_tweet_ids }) => edit_history_tweet_ids));
   const cachedTweets = cached.data!.filter(({ id }) => newTweetsIds.has(id) === false); // filter edited tweets
   const newTweetsSlice = newTweets.concat(cachedTweets).slice(0, 50); // limit to 50 tweets
-
-  // console.log(`[Cache more] Fetched ${more.meta.result_count} new tweets for cached query, returning merged data`);
-
-  stats.retained += 50 - more.meta.result_count; // count retained tweets
-  stats.fetched += more.meta.result_count; // count fetched tweets
 
   return {
     data: newTweetsSlice,
@@ -133,6 +126,9 @@ const tweets = async (
 
       if (data.meta.result_count) {
         data = mergeMore(cachedTweetResponse, data);
+
+        stats.fetched += data.meta.result_count; // count fetched tweets
+        stats.retained += 50 - data.meta.result_count; // count retained tweets
 
         await redisClient.set(search, JSON.stringify(data), "EX", config.cache.ttlMax);
       } else {
