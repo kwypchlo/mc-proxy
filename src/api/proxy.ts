@@ -8,6 +8,7 @@ import type { StatusCode } from "hono/utils/http-status";
 import chalk from "chalk";
 import { rand } from "../utils";
 import z from "zod";
+import { redisClient } from "../redis";
 
 const zTweet = z.object({
   author_id: z.string().min(1),
@@ -195,7 +196,7 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
     const retainRatio = Math.floor((cacheStats.retained / (cacheStats.fetched + cacheStats.retained)) * 100) || 0;
 
     console.log(
-      `📦 Cache: redis ${cache.redisClient.isReady ? "ok" : "no"}, misses ${cacheStats.misses}, hits ${cacheStats.hits} (${cacheRatio}%), size ${await cache.size()}, ttl: ${config.cache.ttl} (${config.cache.ttlMax} max)`,
+      `📦 Cache: redis ${redisClient.status}, misses ${cacheStats.misses}, hits ${cacheStats.hits} (${cacheRatio}%), size ${await cache.size()}, ttl: ${config.cache.ttl} (${config.cache.ttlMax} max)`,
     );
 
     console.log(
