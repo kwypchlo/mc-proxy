@@ -125,10 +125,10 @@ const tweets = async (
       }
 
       if (data.meta.result_count) {
-        data = mergeMore(cachedTweetResponse, data);
-
         stats.fetched += data.meta.result_count; // count fetched tweets
         stats.retained += 50 - data.meta.result_count; // count retained tweets
+
+        data = mergeMore(cachedTweetResponse, data);
 
         await redisClient.set(search, JSON.stringify(data), "EX", config.cache.ttlMax);
       } else {
