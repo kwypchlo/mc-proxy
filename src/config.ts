@@ -10,13 +10,12 @@ const configSchema = z.object({
     }),
   ),
   cache: z.object({
-    ttl: z.number().int().nonnegative().default(100), // default to 100 seconds
+    ttl: z.number().int().nonnegative().default(75), // default to 75 seconds
+    ttlMax: z.number().int().nonnegative().default(900), // default to 15 minutes
   }),
-  redis: z
-    .object({
-      url: z.string().url(),
-    })
-    .optional(),
+  redis: z.object({
+    url: z.string().url(),
+  }),
   coingeckoApiKey: z.string().optional(),
 });
 
