@@ -20,9 +20,7 @@ const createSubscriber = async (url: string) => {
   const redisSubscriber = (globalThis.redisSubscriber = new Redis(url, { enableAutoPipelining: true }));
 
   // ensure keyspace events are enabled and configured to send events for all key types
-  await redisSubscriber.config("SET", "notify-keyspace-events", "KEA");
-
-  console.log("Subscribing to keyspace events");
+  await redisSubscriber.config("SET", "notify-keyspace-events", "AKE");
 
   return redisSubscriber;
 };

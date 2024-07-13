@@ -23,7 +23,13 @@ const getConfig = async () => {
     throw new Error("Config not found in redis");
   }
 
-  return configSchema.parseAsync(JSON.parse(configString));
+  const newConfig = await configSchema.parseAsync(JSON.parse(configString));
+
+  console.log(
+    `🔧 Config refreshed from redis [tenants: ${newConfig.tenants.map(({ name }) => name).join(", ")}], [ttl: ${newConfig.cache.ttl}, ttlMax: ${newConfig.cache.ttlMax}], [coingecko: ${Boolean(newConfig.coingeckoApiKey)}]`,
+  );
+
+  return newConfig;
 };
 
 export type Config = z.infer<typeof configSchema>;

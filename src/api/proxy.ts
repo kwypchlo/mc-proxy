@@ -1,7 +1,7 @@
 import ky, { HTTPError } from "ky";
 import { stats } from "../stats";
 import { config, type Config } from "../config";
-import { getTenant, invalidTokens, useNextToken, pendingTokens } from "../tenant";
+import { getTenant, invalidTokens, useNextToken } from "../tenant";
 import type { Context, Next } from "hono";
 import ms from "pretty-ms";
 import type { StatusCode } from "hono/utils/http-status";
@@ -199,9 +199,9 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
       `📊 Tweets: fetched ${stats.fetched}, retained ${stats.retained} (${retainRatio}%), total ${stats.fetched + stats.retained} requested`,
     );
 
-    console.log(
-      `🔑 Api keys in use: ${JSON.stringify(Object.keys(pendingTokens).map((tenant) => [tenant, Object.values(pendingTokens[tenant])]))}`,
-    );
+    // console.log(
+    //   `🔑 Api keys in use: ${JSON.stringify(Object.keys(pendingTokens).map((tenant) => [tenant, Object.values(pendingTokens[tenant])]))}`,
+    // );
 
     if (invalidTokens.size > 0) {
       console.log(`🚫 Invalid tokens: ${JSON.stringify(Array.from(invalidTokens.keys()), null, 2)}`);
