@@ -1,4 +1,6 @@
 {
+  "name": "mc-proxy",
+  "type": "module",
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "prepare": "husky"

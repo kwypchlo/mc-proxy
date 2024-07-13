@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { config } from "./config";
+import { env } from "./env";
 
 declare global {
   var redisClient: Redis;
@@ -12,4 +12,4 @@ const createClient = async (url: string) => {
   return (globalThis.redisClient = new Redis(url, { enableAutoPipelining: true }));
 };
 
-export const redisClient = await createClient(config.redis.url);
+export const redisClient = await createClient(env.REDIS_URL);

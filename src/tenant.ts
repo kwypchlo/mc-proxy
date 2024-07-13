@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { getConnInfo } from "hono/bun";
-import { config } from "./config";
+import { config, type Config } from "./config";
 import { HTTPException } from "hono/http-exception";
 import { shuffle } from "lodash-es";
 
@@ -37,7 +37,7 @@ export const getTenant = (c: Context) => {
   return tenant;
 };
 
-export const useNextToken = (tenant: (typeof config.tenants)[number]) => {
+export const useNextToken = (tenant: Config["tenants"][number]) => {
   const tokens = shuffle(tenant.tokens.filter((token) => invalidTokens.has(token) === false));
   let selected = tokens[0];
 
@@ -59,6 +59,7 @@ export const useNextToken = (tenant: (typeof config.tenants)[number]) => {
 
   return {
     token: selected,
+    pendingCount: pendingTokens[tenant.name][selected] - 1,
     releaseToken: () => {
       pendingTokens[tenant.name][selected]--;
     },

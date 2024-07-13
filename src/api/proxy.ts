@@ -1,6 +1,6 @@
 import ky, { HTTPError } from "ky";
 import { stats } from "../stats";
-import { config } from "../config";
+import { config, type Config } from "../config";
 import { getTenant, invalidTokens, useNextToken, pendingTokens } from "../tenant";
 import type { Context, Next } from "hono";
 import ms from "pretty-ms";
@@ -52,7 +52,7 @@ const mergeMore = (cached: ApiTweetResponse, more: ApiTweetResponse): ApiTweetRe
 
 const tweets = async (
   search: string,
-  tenant: (typeof config.tenants)[number],
+  tenant: Config["tenants"][number],
 ): Promise<{ data?: ApiTweetResponse; status: StatusCode; cacheStatus: string }> => {
   let currentToken: null | ReturnType<typeof useNextToken> = null;
   let cacheStatus: "miss" | "hit" | "more" = "miss";
