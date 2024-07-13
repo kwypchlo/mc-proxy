@@ -1,10 +1,11 @@
 import type { Context } from "hono";
-import { config } from "../config";
+import { getConfig } from "../config";
 import TTLCache from "@isaacs/ttlcache";
 
 const memCache = new TTLCache<string, string>({ ttl: 10 * 60 * 1000, checkAgeOnGet: true }); // ttl 10 minutes
 
 export const comaiApi = async (c: Context) => {
+  const config = await getConfig();
   if (!config.coingeckoApiKey) {
     return c.json({ message: "Missing COINGECKO_API_KEY" }, 500);
   }

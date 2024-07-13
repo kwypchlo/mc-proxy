@@ -1,6 +1,6 @@
 import ky, { HTTPError } from "ky";
 import { stats } from "../stats";
-import { config, type Config } from "../config";
+import { getConfig, type Config } from "../config";
 import { getTenant, invalidTokens, useNextToken, pendingTokens } from "../tenant";
 import type { Context, Next } from "hono";
 import ms from "pretty-ms";
@@ -54,6 +54,7 @@ const tweets = async (
   search: string,
   tenant: Config["tenants"][number],
 ): Promise<{ data?: ApiTweetResponse; status: StatusCode; cacheStatus: string }> => {
+  const config = await getConfig();
   let currentToken: null | ReturnType<typeof useNextToken> = null;
   let cacheStatus: "miss" | "hit" | "more" = "miss";
   let cachedTweetResponse: ApiTweetResponse | null = null;
@@ -171,7 +172,7 @@ const tweets = async (
 
 export const proxyApi = async (c: Context) => {
   const start = performance.now();
-  const tenant = getTenant(c);
+  const tenant = await getTenant(c);
 
   const { search, searchParams } = new URL(c.req.url);
   const { data, status, cacheStatus } = await tweets(search, tenant);

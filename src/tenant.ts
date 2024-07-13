@@ -1,13 +1,13 @@
 import type { Context } from "hono";
 import { getConnInfo } from "hono/bun";
-import { config, type Config } from "./config";
+import { getConfig, type Config } from "./config";
 import { HTTPException } from "hono/http-exception";
 import { shuffle } from "lodash-es";
 
 export const invalidTokens = new Map();
 export const pendingTokens = {} as Record<string, { [token: string]: number }>;
 
-export const getTenant = (c: Context) => {
+export const getTenant = async (c: Context) => {
   const connInfo = getConnInfo(c);
 
   if (connInfo.remote.addressType !== "IPv4") {
@@ -20,6 +20,7 @@ export const getTenant = (c: Context) => {
     throw new HTTPException(400, { message: "Failed to get remote address" });
   }
 
+  const config = await getConfig();
   const tenant = config.tenants.find(({ servers }) => servers.includes(address));
 
   if (tenant === undefined) {

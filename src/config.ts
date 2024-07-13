@@ -17,4 +17,6 @@ const configSchema = z.object({
 });
 
 export type Config = z.infer<typeof configSchema>;
-export const config = configSchema.parse(configJson);
+export const getConfig = async (): Promise<Config> => {
+  return configSchema.parseAsync(configJson);
+};
