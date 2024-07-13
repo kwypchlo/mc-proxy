@@ -7,7 +7,7 @@ export const comaiApi = async (c: Context) => {
     return c.json({ message: "Missing COINGECKO_API_KEY" }, 500);
   }
 
-  const cached = redisClient.get("coingecko-comai");
+  const cached = await redisClient.get("coingecko-comai");
   if (cached) return c.json(cached);
 
   const data = await (
@@ -20,7 +20,7 @@ export const comaiApi = async (c: Context) => {
     })
   ).json();
 
-  redisClient.set("coingecko-comai", data, "EX", 10 * 60); // cache for 10 minutes
+  await redisClient.set("coingecko-comai", data, "EX", 10 * 60); // cache for 10 minutes
 
   return c.json(data);
 };
