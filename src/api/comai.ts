@@ -20,7 +20,7 @@ export const comaiApi = async (c: Context) => {
     })
   ).json();
 
-  await redisClient.set("coingecko-comai", data, "EX", 10 * 60); // cache for 10 minutes
+  await redisClient.set("coingecko-comai", JSON.stringify(data), "EX", 10 * 60); // cache for 10 minutes
 
   return c.json(data);
 };
