@@ -8,7 +8,7 @@ export const comaiApi = async (c: Context) => {
   }
 
   const cached = await redisClient.get("coingecko-comai");
-  if (cached) return c.json(cached);
+  if (cached) return c.json(JSON.parse(cached));
 
   const data = await (
     await fetch("https://api.coingecko.com/api/v3/coins/commune-ai", {
