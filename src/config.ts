@@ -1,5 +1,5 @@
 import z from "zod";
-import configJson from "../.config.json";
+import { redisSubscriber } from "./redis";
 
 const configSchema = z.object({
   tenants: z.array(
@@ -16,7 +16,23 @@ const configSchema = z.object({
   coingeckoApiKey: z.string().optional(),
 });
 
-export type Config = z.infer<typeof configSchema>;
-export const getConfig = async (): Promise<Config> => {
-  return configSchema.parseAsync(configJson);
+const getConfig = async () => {
+  const configString = await redisClient.get("config");
+
+  if (configString === null) {
+    throw new Error("Config not found in redis");
+  }
+
+  return configSchema.parseAsync(JSON.parse(configString));
 };
+
+export type Config = z.infer<typeof configSchema>;
+export let config = await getConfig();
+
+await redisSubscriber.subscribe("__keyspace@0__:config");
+
+redisSubscriber.on("message", async (channel, message) => {
+  if (channel === "__keyspace@0__:config") {
+    config = await getConfig();
+  }
+});

@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { getConnInfo } from "hono/bun";
-import { getConfig, type Config } from "./config";
+import { config, type Config } from "./config";
 import { HTTPException } from "hono/http-exception";
 import { shuffle } from "lodash-es";
 
@@ -20,7 +20,6 @@ export const getTenant = async (c: Context) => {
     throw new HTTPException(400, { message: "Failed to get remote address" });
   }
 
-  const config = await getConfig();
   const tenant = config.tenants.find(({ servers }) => servers.includes(address));
 
   if (tenant === undefined) {

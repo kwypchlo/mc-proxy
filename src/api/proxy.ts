@@ -1,6 +1,6 @@
 import ky, { HTTPError } from "ky";
 import { stats } from "../stats";
-import { getConfig, type Config } from "../config";
+import { config, type Config } from "../config";
 import { getTenant, invalidTokens, useNextToken, pendingTokens } from "../tenant";
 import type { Context, Next } from "hono";
 import ms from "pretty-ms";
@@ -54,7 +54,6 @@ const tweets = async (
   search: string,
   tenant: Config["tenants"][number],
 ): Promise<{ data?: ApiTweetResponse; status: StatusCode; cacheStatus: string }> => {
-  const config = await getConfig();
   let currentToken: null | ReturnType<typeof useNextToken> = null;
   let cacheStatus: "miss" | "hit" | "more" = "miss";
   let cachedTweetResponse: ApiTweetResponse | null = null;
@@ -189,7 +188,6 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
 
   // print cache stats every 50 handled requests
   if (++stats.requests % 50 === 0) {
-    const config = await getConfig();
     const cacheRatio = Math.floor((stats.hits / (stats.hits + stats.misses)) * 100) || 0;
     const retainRatio = Math.floor((stats.retained / (stats.fetched + stats.retained)) * 100) || 0;
 
