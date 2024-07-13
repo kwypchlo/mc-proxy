@@ -1,8 +1,5 @@
 import type { Context } from "hono";
 import { getConfig } from "../config";
-import TTLCache from "@isaacs/ttlcache";
-
-const memCache = new TTLCache<string, string>({ ttl: 10 * 60 * 1000, checkAgeOnGet: true }); // ttl 10 minutes
 
 export const comaiApi = async (c: Context) => {
   const config = await getConfig();
@@ -10,9 +7,8 @@ export const comaiApi = async (c: Context) => {
     return c.json({ message: "Missing COINGECKO_API_KEY" }, 500);
   }
 
-  if (memCache.has("coingecko-comai")) {
-    return c.json(memCache.get("coingecko-comai"));
-  }
+  const cached = redisClient.get("coingecko-comai");
+  if (cached) return c.json(cached);
 
   const data = await (
     await fetch("https://api.coingecko.com/api/v3/coins/commune-ai", {
@@ -24,7 +20,7 @@ export const comaiApi = async (c: Context) => {
     })
   ).json();
 
-  memCache.set("coingecko-comai", data);
+  redisClient.set("coingecko-comai", data, "EX", 10 * 60); // cache for 10 minutes
 
   return c.json(data);
 };
