@@ -189,6 +189,7 @@ export const proxyApiMiddleware = async (c: Context, next: Next) => {
 
   // print cache stats every 50 handled requests
   if (++stats.requests % 50 === 0) {
+    const config = await getConfig();
     const cacheRatio = Math.floor((stats.hits / (stats.hits + stats.misses)) * 100) || 0;
     const retainRatio = Math.floor((stats.retained / (stats.fetched + stats.retained)) * 100) || 0;
 
