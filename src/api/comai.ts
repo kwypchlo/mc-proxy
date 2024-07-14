@@ -1,8 +1,7 @@
 import type { Context } from "hono";
-import { getConfig } from "../config";
+import { config } from "../config";
 
 export const comaiApi = async (c: Context) => {
-  const config = await getConfig();
   if (!config.coingeckoApiKey) {
     return c.json({ message: "Missing COINGECKO_API_KEY" }, 500);
   }
