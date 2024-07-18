@@ -76,7 +76,7 @@ const tweets = async (
             if (typeof cached === "string") {
               cachedTweetResponse = JSON.parse(cached) as ApiTweetResponse;
 
-              if (config.cache.ttlMax - config.cache.ttl < ttl) {
+              if (config.cache.ttlMax - (tenant.ttl ?? config.cache.ttl) < ttl) {
                 cacheStatus = "hit";
 
                 // if cached data is cached for more than ttl max, limit to ttl max

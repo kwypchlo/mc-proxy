@@ -5,6 +5,7 @@ const configSchema = z.object({
   tenants: z.array(
     z.object({
       name: z.string().min(1),
+      ttl: z.number().int().nonnegative().optional(),
       servers: z.array(z.string()).min(1),
       tokens: z.array(z.string()).min(1),
     }),
