@@ -153,6 +153,10 @@ const tweets = async (
         invalidTokens.set(usedToken, true);
       }
 
+      if (error.response.status === 400) {
+        return { data: { data: [], meta: { result_count: 0 } }, status: 200, cacheStatus: "miss" };
+      }
+
       return { data: undefined, status: error.response.status as StatusCode, cacheStatus };
     } else if (error instanceof z.ZodError) {
       console.log(`${chalk.red("[Response Validaton Error]")} (${tenant.name}) ${JSON.stringify(error.format())}`);
